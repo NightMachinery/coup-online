@@ -9,7 +9,7 @@ import {
   useRef,
 } from 'react'
 import {
-  User,
+  User as FirebaseUser,
   AuthProvider,
   OAuthCredential,
   onAuthStateChanged,
@@ -22,12 +22,16 @@ import {
 import { FirebaseError } from 'firebase/app'
 import { auth, googleProvider, githubProvider } from '../firebase'
 import { getBaseUrl } from '../helpers/api'
+import { getOrCreateLocalAuthProfile, resetLocalAuthProfile } from '../helpers/localAuth'
+import { isLocalAuthEnabled } from '../helpers/api'
 
 type SignInResult = { linked: boolean }
+export type AppUser = Pick<FirebaseUser, 'uid' | 'displayName' | 'photoURL' | 'email' | 'getIdToken'>
 
 type AuthContextType = {
-  user: User | null
+  user: AppUser | null
   loading: boolean
+  isLocalAuth: boolean
   signInWithGoogle: () => Promise<SignInResult>
   signInWithGitHub: () => Promise<SignInResult>
   signOut: () => Promise<void>
@@ -38,6 +42,7 @@ type AuthContextType = {
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
+  isLocalAuth: false,
   signInWithGoogle: async () => ({ linked: false }),
   signInWithGitHub: async () => ({ linked: false }),
   signOut: async () => { },
@@ -46,10 +51,28 @@ const AuthContext = createContext<AuthContextType>({
 })
 
 export function AuthContextProvider({ children }: Readonly<{ children: ReactNode }>) {
-  const [user, setUser] = useState<User | null>(null)
+  const [user, setUser] = useState<AppUser | null>(null)
   const [loading, setLoading] = useState(true)
+  const localAuthEnabled = isLocalAuthEnabled()
+
+  const getLocalUser = useCallback((): AppUser => {
+    const profile = getOrCreateLocalAuthProfile()
+    return {
+      uid: profile.uid,
+      displayName: profile.displayName,
+      photoURL: null,
+      email: null,
+      getIdToken: async () => profile.token,
+    }
+  }, [])
 
   useEffect(() => {
+    if (localAuthEnabled) {
+      setUser(getLocalUser())
+      setLoading(false)
+      return
+    }
+
     if (!auth) {
       setLoading(false)
       return
@@ -59,11 +82,12 @@ export function AuthContextProvider({ children }: Readonly<{ children: ReactNode
       setLoading(false)
     })
     return unsubscribe
-  }, [])
+  }, [getLocalUser, localAuthEnabled])
 
   const pendingCredential = useRef<OAuthCredential | null>(null)
 
   const signInAndLink = useCallback(async (provider: AuthProvider): Promise<SignInResult> => {
+    if (localAuthEnabled) return { linked: false }
     if (!auth) throw new Error('Firebase auth is not configured')
     try {
       const result = await signInWithPopup(auth, provider)
@@ -87,17 +111,28 @@ export function AuthContextProvider({ children }: Readonly<{ children: ReactNode
       }
       throw error
     }
-  }, [])
+  }, [localAuthEnabled])
 
   const signInWithGoogle = useCallback(() => signInAndLink(googleProvider), [signInAndLink])
   const signInWithGitHub = useCallback(() => signInAndLink(githubProvider), [signInAndLink])
 
   const signOut = useCallback(async () => {
+    if (localAuthEnabled) {
+      resetLocalAuthProfile()
+      setUser(getLocalUser())
+      return
+    }
     if (!auth) return
     await firebaseSignOut(auth)
-  }, [])
+  }, [getLocalUser, localAuthEnabled])
 
   const deleteAccount = useCallback(async () => {
+    if (localAuthEnabled) {
+      resetLocalAuthProfile()
+      setUser(getLocalUser())
+      return
+    }
+
     const currentUser = auth?.currentUser
     if (!currentUser) return
 
@@ -118,22 +153,26 @@ export function AuthContextProvider({ children }: Readonly<{ children: ReactNode
     }
 
     setUser(null)
-  }, [])
+  }, [getLocalUser, localAuthEnabled])
 
   const getIdToken = useCallback(async () => {
+    if (localAuthEnabled) {
+      return user?.getIdToken() ?? null
+    }
     if (!auth?.currentUser) return null
     return auth.currentUser.getIdToken()
-  }, [])
+  }, [localAuthEnabled, user])
 
   const value = useMemo(() => ({
     user,
     loading,
+    isLocalAuth: localAuthEnabled,
     signInWithGoogle,
     signInWithGitHub,
     signOut,
     deleteAccount,
     getIdToken,
-  }), [user, loading, signInWithGoogle, signInWithGitHub, signOut, deleteAccount, getIdToken])
+  }), [user, loading, localAuthEnabled, signInWithGoogle, signInWithGitHub, signOut, deleteAccount, getIdToken])
 
   return (
     <AuthContext.Provider value={value}>

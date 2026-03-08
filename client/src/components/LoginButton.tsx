@@ -20,12 +20,16 @@ import { useTranslationContext } from '../contexts/TranslationsContext'
 import { Link as RouterLink } from 'react-router'
 
 function LoginButton({ buttonProps }: Readonly<{ buttonProps?: ButtonProps }>) {
-  const { user, loading, signInWithGoogle, signInWithGitHub, signOut } = useAuthContext()
+  const { user, loading, signInWithGoogle, signInWithGitHub, signOut, isLocalAuth } = useAuthContext()
   const { showNotification } = useNotificationsContext()
   const { t } = useTranslationContext()
   const { isSmallScreen } = useTheme()
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
   const menuOpen = Boolean(anchorEl)
+
+  if (isLocalAuth) {
+    return null
+  }
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget)

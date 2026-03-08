@@ -3,6 +3,7 @@ import { Link as RouterLink, useLocation } from 'react-router'
 import { useTranslationContext } from '../contexts/TranslationsContext'
 import CoupTypography from './utilities/CoupTypography'
 import { Translations } from '../i18n/translations'
+import { useAuthContext } from '../contexts/AuthContext'
 
 const routeLabels: Record<string, keyof Translations> = {
   'create-game': 'createNewGame',
@@ -14,9 +15,14 @@ const routeLabels: Record<string, keyof Translations> = {
 function AppBreadcrumbs() {
   const { pathname } = useLocation()
   const { t } = useTranslationContext()
+  const { isLocalAuth } = useAuthContext()
 
   const segment = pathname.split('/').find(Boolean)
   if (!segment) return null
+
+  if (isLocalAuth && (segment === 'leaderboard' || segment === 'profile')) {
+    return null
+  }
 
   const labelKey = routeLabels[segment]
   if (!labelKey) return null

@@ -4,6 +4,7 @@ import GitHubLinks from "../GitHubLinks"
 import { useTranslationContext } from "../../contexts/TranslationsContext"
 import { AddCircle, EmojiEvents, Gavel, GroupAdd } from "@mui/icons-material"
 import CoupTypography from '../utilities/CoupTypography'
+import { useAuthContext } from '../../contexts/AuthContext'
 
 interface HomeProps {
   setRulesOpen: (open: boolean) => void
@@ -11,6 +12,7 @@ interface HomeProps {
 
 function Home({ setRulesOpen }: Readonly<HomeProps>) {
   const { t } = useTranslationContext()
+  const { isLocalAuth } = useAuthContext()
 
   return (
     <>
@@ -38,12 +40,14 @@ function Home({ setRulesOpen }: Readonly<HomeProps>) {
           to="/join-game"
           startIcon={<GroupAdd />}
         >{t('joinExistingGame')}</Button>
-        <Button
-          variant="contained"
-          component={RouterLink}
-          to="/leaderboard"
-          startIcon={<EmojiEvents />}
-        >{t('viewLeaderboard')}</Button>
+        {!isLocalAuth && (
+          <Button
+            variant="contained"
+            component={RouterLink}
+            to="/leaderboard"
+            startIcon={<EmojiEvents />}
+          >{t('viewLeaderboard')}</Button>
+        )}
       </Grid>
       <GitHubLinks />
     </>

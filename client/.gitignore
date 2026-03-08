@@ -1,6 +1,7 @@
 # env
 .env
 .env.local
+.env.self-hosted.local
 
 # dependencies
 /node_modules

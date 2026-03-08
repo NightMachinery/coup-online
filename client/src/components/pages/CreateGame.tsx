@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   Box,
   Button,
@@ -10,7 +10,6 @@ import {
 import { AddCircle, Person } from '@mui/icons-material'
 import { useNavigate } from 'react-router'
 import { getPlayerId } from '../../helpers/players'
-import { Analytics } from '@vercel/analytics/react'
 import {
   GameSettings,
   PlayerActions,
@@ -31,14 +30,14 @@ import { useDisplayName } from '../../hooks/useDisplayName'
 
 function CreateGame() {
   const [playerName, setPlayerName] = useState('')
-  const { displayName: profileName, loading: profileNameLoading } = useDisplayName()
+  const { displayName: profileName, loading: profileNameLoading, saveDisplayName } = useDisplayName()
   const [eventLogRetentionTurns, setEventLogRetentionTurns] = usePersistedState<number>(eventLogRetentionTurnsStorageKey, 3)
   const [allowRevive, setAllowRevive] = usePersistedState<boolean>(allowReviveStorageKey, false)
   const [speedRoundEnabled, setSpeedRoundEnabled] = usePersistedState<boolean>(speedRoundEnabledStorageKey, false)
   const [speedRoundSeconds, setSpeedRoundSeconds] = usePersistedState<number>(speedRoundSecondsStorageKey, 10)
   const navigate = useNavigate()
   const { t } = useTranslationContext()
-  const { user } = useAuthContext()
+  const { user, isLocalAuth } = useAuthContext()
 
   const navigateToRoom = useCallback(
     (gameState: DehydratedPublicGameState) => {
@@ -55,18 +54,31 @@ function CreateGame() {
     photoURL?: string
   }>({ action: PlayerActions.createGame, callback: navigateToRoom })
 
+  const visiblePlayerName = isLocalAuth
+    ? playerName
+    : (profileName ?? playerName)
+
+  useEffect(() => {
+    if (isLocalAuth && profileName && !playerName) {
+      setPlayerName(profileName)
+    }
+  }, [isLocalAuth, playerName, profileName])
+
   return (
     <>
-      <Analytics />
       <CoupTypography variant="h5" sx={{ m: 5 }} addTextShadow>
         {t('createNewGame')}
       </CoupTypography>
       <form
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault()
+          const submittedPlayerName = visiblePlayerName.trim()
+          if (isLocalAuth) {
+            await saveDisplayName(submittedPlayerName)
+          }
           trigger({
             playerId: getPlayerId(),
-            playerName: (profileName ?? playerName).trim(),
+            playerName: submittedPlayerName,
             settings: {
               eventLogRetentionTurns,
               allowRevive,
@@ -85,17 +97,17 @@ function CreateGame() {
                 name="coup-game-player-name"
                 autoComplete="off"
                 data-testid="playerNameInput"
-                value={profileName ?? playerName}
+                value={visiblePlayerName}
                 onChange={(event) => {
-                  if (!profileName) {
+                  if (isLocalAuth || !profileName) {
                     setPlayerName(event.target.value.slice(0, 10))
                   }
                 }}
-                label={!profileName && t('whatIsYourName')}
+                label={(!profileName || isLocalAuth) && t('whatIsYourName')}
                 variant="standard"
-                required={!profileName}
-                disabled={!!profileName || profileNameLoading}
-                helperText={profileName ? t('nameFromProfile') : undefined}
+                required={!visiblePlayerName}
+                disabled={profileNameLoading}
+                helperText={!isLocalAuth && profileName ? t('nameFromProfile') : undefined}
               />
             </Box>
           </Grid>

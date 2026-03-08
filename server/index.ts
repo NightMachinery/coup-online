@@ -14,7 +14,7 @@ import { AvailableLanguageCode } from '../shared/i18n/availableLanguages'
 import { translate } from './src/i18n/translations'
 import { getUserStats, getLeaderboard, getDisplayName, setDisplayName, deleteUserStats } from './src/utilities/stats'
 import { verifyIdToken } from './src/auth'
-import { adminAuth } from './src/firebase'
+import { adminAuth, firebaseConfigured } from './src/firebase'
 import { containsProfanity } from './src/utilities/profanity'
 
 export type DehydratedPublicGameStateOrError = { gameState: DehydratedPublicGameState, error?: never } | { error: string, gameState?: never }
@@ -616,9 +616,12 @@ const responseHandler = <T>(
 }
 
 getObjectEntries(eventHandlers).forEach(([event, { express, handler, joiSchema }]) => {
-  app[express.method](`/${event}`, express.validator(joiSchema), (req, res) => {
+  const routeHandler = (req: Request, res: Response) => {
     return responseHandler(event, handler)(res, express.parseParams(req))
-  })
+  }
+
+  app[express.method](`/${event}`, express.validator(joiSchema), routeHandler)
+  app[express.method](`/api/game/${event}`, express.validator(joiSchema), routeHandler)
 })
 
 // Stats API endpoints
@@ -648,6 +651,11 @@ app.get('/api/users/:uid/displayName', async (req, res) => {
 
 app.put('/api/users/displayName', json(), async (req, res) => {
   try {
+    if (!firebaseConfigured) {
+      res.status(503).json({ error: 'statsUnavailable' })
+      return
+    }
+
     const authHeader = req.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json({ error: 'unauthorized' })
@@ -692,6 +700,11 @@ app.put('/api/users/displayName', json(), async (req, res) => {
 
 app.delete('/api/users/account', async (req, res) => {
   try {
+    if (!firebaseConfigured || !adminAuth) {
+      res.status(503).json({ error: 'statsUnavailable' })
+      return
+    }
+
     const authHeader = req.headers.authorization
     if (!authHeader?.startsWith('Bearer ')) {
       res.status(401).json({ error: 'unauthorized' })

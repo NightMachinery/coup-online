@@ -1,5 +1,4 @@
-import { useCallback, useState, useRef } from "react"
-import { Analytics } from '@vercel/analytics/react'
+import { useCallback, useEffect, useState, useRef } from "react"
 import { Box, Button, Grid, TextField } from "@mui/material"
 import { Person, Group, GroupAdd, Visibility } from "@mui/icons-material"
 import { useNavigate, useSearchParams } from "react-router"
@@ -15,10 +14,10 @@ function JoinGame() {
   const [searchParams] = useSearchParams()
   const [roomId, setRoomId] = useState(searchParams.get('roomId') ?? '')
   const [playerName, setPlayerName] = useState('')
-  const { displayName: profileName, loading: profileNameLoading } = useDisplayName()
+  const { displayName: profileName, loading: profileNameLoading, saveDisplayName } = useDisplayName()
   const navigate = useNavigate()
   const { t } = useTranslationContext()
-  const { user } = useAuthContext()
+  const { user, isLocalAuth } = useAuthContext()
   const formRef = useRef<HTMLFormElement>(null)
   const playerNameInputRef = useRef<HTMLInputElement>(null)
 
@@ -34,29 +33,44 @@ function JoinGame() {
     roomId: string, playerId: string
   }>({ action: PlayerActions.gameState, callback: navigateToRoom })
 
+  const visiblePlayerName = isLocalAuth
+    ? playerName
+    : (profileName ?? playerName)
+
+  useEffect(() => {
+    if (isLocalAuth && profileName && !playerName) {
+      setPlayerName(profileName)
+    }
+  }, [isLocalAuth, playerName, profileName])
+
   return (
     <>
-      <Analytics />
       <CoupTypography variant="h5" sx={{ m: 5 }} addTextShadow>
         {t('joinExistingGame')}
       </CoupTypography>
       <form
         ref={formRef}
         noValidate
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault()
 
           const buttonId = event.nativeEvent.submitter?.id
 
           if (buttonId === 'joinGameButton') {
             playerNameInputRef.current!.setAttribute('required', '')
-            if (formRef.current!.checkValidity()) joinTrigger({
-              roomId: roomId.trim(),
-              playerId: getPlayerId(),
-              playerName: (profileName ?? playerName).trim(),
-              ...(user && { uid: user.uid }),
-              ...(user?.photoURL && { photoURL: user.photoURL }),
-            })
+            if (formRef.current!.checkValidity()) {
+              const submittedPlayerName = visiblePlayerName.trim()
+              if (isLocalAuth) {
+                await saveDisplayName(submittedPlayerName)
+              }
+              joinTrigger({
+                roomId: roomId.trim(),
+                playerId: getPlayerId(),
+                playerName: submittedPlayerName,
+                ...(user && { uid: user.uid }),
+                ...(user?.photoURL && { photoURL: user.photoURL }),
+              })
+            }
           } else if (buttonId === 'spectateGameButton') {
             playerNameInputRef.current!.removeAttribute('required')
             if (formRef.current!.checkValidity()) spectateTrigger({
@@ -95,17 +109,17 @@ function JoinGame() {
                   htmlInput: { ref: playerNameInputRef }
                 }}
                 data-testid='playerNameInput'
-                value={profileName ?? playerName}
+                value={visiblePlayerName}
                 onChange={(event) => {
-                  if (!profileName) {
+                  if (isLocalAuth || !profileName) {
                     setPlayerName(event.target.value.slice(0, 10))
                   }
                 }}
-                label={!profileName && t('whatIsYourName')}
+                label={(!profileName || isLocalAuth) && t('whatIsYourName')}
                 variant="standard"
-                required={!profileName}
-                disabled={!!profileName || profileNameLoading}
-                helperText={profileName ? t('nameFromProfile') : undefined}
+                required={!visiblePlayerName}
+                disabled={profileNameLoading}
+                helperText={!isLocalAuth && profileName ? t('nameFromProfile') : undefined}
               />
             </Box>
           </Grid>

@@ -7,9 +7,9 @@ import {
   useState,
 } from 'react'
 import { io, Socket } from 'socket.io-client'
+import { getSocketBaseUrl } from '../helpers/api'
 
-const socketUrl =
-  import.meta.env.VITE_SOCKET_SERVER_URL ?? 'http://localhost:8008'
+const socketUrl = getSocketBaseUrl()
 const socketPath = import.meta.env.VITE_SOCKET_SERVER_PATH ?? ''
 
 type WebSocketContextType = { socket?: Socket; isConnected: boolean };

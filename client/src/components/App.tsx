@@ -27,6 +27,7 @@ import LoginButton from './LoginButton'
 import Profile from './pages/Profile'
 import Leaderboard from './pages/Leaderboard'
 import AppBreadcrumbs from './AppBreadcrumbs'
+import { useAuthContext } from '../contexts/AuthContext'
 
 function App() {
   const [leftDrawerOpen, setLeftDrawerOpen] = useState(false)
@@ -35,6 +36,7 @@ function App() {
   const { t } = useTranslationContext()
   const theme = useTheme()
   const { showBackgroundImage } = useUserSettingsContext()
+  const { isLocalAuth } = useAuthContext()
 
   return (
     <Box sx={{
@@ -110,11 +112,13 @@ function App() {
                     </Typography>
                   </Button>
                 </Link>
-                <Tooltip title={t('leaderboard')}>
-                  <IconButton component={RouterLink} to="/leaderboard" color="primary" size="large">
-                    <EmojiEvents sx={{ fontSize: '2rem' }} />
-                  </IconButton>
-                </Tooltip>
+                {!isLocalAuth && (
+                  <Tooltip title={t('leaderboard')}>
+                    <IconButton component={RouterLink} to="/leaderboard" color="primary" size="large">
+                      <EmojiEvents sx={{ fontSize: '2rem' }} />
+                    </IconButton>
+                  </Tooltip>
+                )}
                 <LoginButton buttonProps={{ size: 'large' }} />
                 <UserSettings />
               </Box>
@@ -128,8 +132,8 @@ function App() {
                 } />
                 <Route path="join-game" element={<JoinGame />} />
                 <Route path="create-game" element={<CreateGame />} />
-                <Route path="profile/:uid" element={<Profile />} />
-                <Route path="leaderboard" element={<Leaderboard />} />
+                {!isLocalAuth && <Route path="profile/:uid" element={<Profile />} />}
+                {!isLocalAuth && <Route path="leaderboard" element={<Leaderboard />} />}
                 <Route path="*" element={<Typography variant='h3' sx={{ mt: 10 }}>{t('pageNotFound')} 😱 - <Link component={RouterLink} to={'/'}>{t('home')}</Link></Typography>} />
               </Route>
             </Routes>

@@ -1,15 +1,22 @@
 import { useEffect, useState } from 'react'
 import { useAuthContext } from '../contexts/AuthContext'
 import { getBaseUrl } from '../helpers/api'
+import { readLocalAuthProfile, saveLocalAuthDisplayName } from '../helpers/localAuth'
 
 export function useDisplayName() {
-  const { user } = useAuthContext()
+  const { user, isLocalAuth } = useAuthContext()
   const [displayName, setDisplayName] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (!user?.uid) {
       setDisplayName(null)
+      return
+    }
+
+    if (isLocalAuth) {
+      setDisplayName(readLocalAuthProfile()?.displayName ?? null)
+      setLoading(false)
       return
     }
 
@@ -25,10 +32,16 @@ export function useDisplayName() {
       .finally(() => {
         setLoading(false)
       })
-  }, [user?.uid])
+  }, [isLocalAuth, user?.uid])
 
   const saveDisplayName = async (name: string): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'Not signed in' }
+
+    if (isLocalAuth) {
+      const profile = saveLocalAuthDisplayName(name)
+      setDisplayName(profile.displayName)
+      return { success: true }
+    }
 
     try {
       const token = await user.getIdToken()

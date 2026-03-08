@@ -5,6 +5,10 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    allowedHosts: true,
+  },
+  preview: {
+    allowedHosts: true,
   },
   build: {
     outDir: 'build',

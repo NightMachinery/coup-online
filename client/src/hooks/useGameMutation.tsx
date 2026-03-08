@@ -3,7 +3,7 @@ import { useMemo, useRef, useState, useEffect } from "react"
 import { useWebSocketContext } from "../contexts/WebSocketContext"
 import { useGameStateContext } from "../contexts/GameStateContext"
 import useSWRMutation from "swr/mutation"
-import { getBaseUrl } from "../helpers/api"
+import { getGameActionUrl } from "../helpers/api"
 import { useNotificationsContext } from "../contexts/NotificationsContext"
 import { useTranslationContext } from '../contexts/TranslationsContext'
 
@@ -19,7 +19,7 @@ function useGameMutation<ParamsType>({ action, callback }: {
   const { showNotification } = useNotificationsContext()
   const { language } = useTranslationContext()
 
-  const { trigger: triggerSwr, isMutating: isMutatingSwr } = useSWRMutation(`${getBaseUrl()}/${action}`, (async (url: string, { arg }: { arg: ParamsType }) => {
+  const { trigger: triggerSwr, isMutating: isMutatingSwr } = useSWRMutation(getGameActionUrl(action), (async (url: string, { arg }: { arg: ParamsType }) => {
     setMutationError('')
     return fetch(url, {
       method: 'POST',

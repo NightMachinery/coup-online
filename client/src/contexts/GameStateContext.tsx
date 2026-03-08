@@ -4,7 +4,7 @@ import { PlayerActions, PublicGameState, DehydratedPublicGameState, ServerEvents
 import { getPlayerId } from '../helpers/players'
 import { useSearchParams } from 'react-router'
 import { useWebSocketContext } from './WebSocketContext'
-import { getBaseUrl } from '../helpers/api'
+import { getGameActionUrl } from '../helpers/api'
 import { useTranslationContext } from './TranslationsContext'
 
 type GameStateContextType = {
@@ -46,7 +46,7 @@ export function GameStateContextProvider({ children }: Readonly<{ children: Reac
 
   useSWR<void, Error>(
     roomId
-      ? `${getBaseUrl()}/${PlayerActions.gameState}?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(getPlayerId())}&language=${encodeURIComponent(language)}`
+      ? `${getGameActionUrl(PlayerActions.gameState)}?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(getPlayerId())}&language=${encodeURIComponent(language)}`
       : null,
     async function (input: RequestInfo, init?: RequestInit) {
       try {
@@ -101,7 +101,7 @@ export function GameStateContextProvider({ children }: Readonly<{ children: Reac
           }
         })
       } else {
-        fetch(`${getBaseUrl()}/${PlayerActions.checkAutoMove}?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(getPlayerId())}`)
+        fetch(`${getGameActionUrl(PlayerActions.checkAutoMove)}?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(getPlayerId())}`)
           .then(handleGameStateResponse)
           .catch((error) => {
             console.error(error)

@@ -101,6 +101,9 @@ const mergeInfluenceClaims = (
 }
 
 export const recordGameStats = async (gameState: GameState) => {
+  if (!firestore) return
+  const activeFirestore = firestore
+
   const { gameId, gameActionStats, players } = gameState
 
   if (!gameId || !gameActionStats) return
@@ -124,11 +127,11 @@ export const recordGameStats = async (gameState: GameState) => {
     const playerStats = gameActionStats[player.name]
     if (!playerStats) continue
 
-    const userRef = firestore.collection(USERS_COLLECTION).doc(player.uid)
+    const userRef = activeFirestore.collection(USERS_COLLECTION).doc(player.uid)
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       try {
-        await firestore.runTransaction(async (transaction) => {
+        await activeFirestore.runTransaction(async (transaction) => {
           const doc = await transaction.get(userRef)
           const existing: UserStats = doc.exists
             ? (doc.data() as UserStats)
@@ -249,10 +252,13 @@ export const recordGameStats = async (gameState: GameState) => {
 }
 
 export const getUserStats = async (uid: string): Promise<UserStats | null> => {
+  if (!firestore) return null
+  const activeFirestore = firestore
+
   const cached = userStatsCache.get(uid)
   if (cached !== undefined) return cached
 
-  const doc = await firestore.collection(USERS_COLLECTION).doc(uid).get()
+  const doc = await activeFirestore.collection(USERS_COLLECTION).doc(uid).get()
   if (!doc.exists) return null
 
   const stats = doc.data() as UserStats
@@ -262,8 +268,8 @@ export const getUserStats = async (uid: string): Promise<UserStats | null> => {
   // Resolve current display names for opponents via batch read
   const opponentUids = Object.keys(stats.opponents || {})
   if (opponentUids.length > 0) {
-    const refs = opponentUids.map(id => firestore.collection(USERS_COLLECTION).doc(id))
-    const docs = await firestore.getAll(...refs)
+    const refs = opponentUids.map(id => activeFirestore.collection(USERS_COLLECTION).doc(id))
+    const docs = await activeFirestore.getAll(...refs)
     for (const opponentDoc of docs) {
       if (opponentDoc.exists && stats.opponents[opponentDoc.id]) {
         const opponentData = opponentDoc.data() as UserStats
@@ -277,10 +283,13 @@ export const getUserStats = async (uid: string): Promise<UserStats | null> => {
 }
 
 export const getDisplayName = async (uid: string): Promise<string | null> => {
+  if (!firestore) return null
+  const activeFirestore = firestore
+
   const cached = displayNameCache.get(uid)
   if (cached !== undefined) return cached
 
-  const doc = await firestore.collection(USERS_COLLECTION).doc(uid).get()
+  const doc = await activeFirestore.collection(USERS_COLLECTION).doc(uid).get()
   if (!doc.exists) {
     displayNameCache.set(uid, null)
     return null
@@ -291,10 +300,15 @@ export const getDisplayName = async (uid: string): Promise<string | null> => {
 }
 
 export const setDisplayName = async (uid: string, displayName: string, photoURL?: string): Promise<{ error?: string }> => {
+  if (!firestore) {
+    return { error: 'statsUnavailable' }
+  }
+  const activeFirestore = firestore
+
   const displayNameLower = displayName.toLowerCase()
 
   // Check if another user already has this name (case-insensitive)
-  const existing = await firestore.collection(USERS_COLLECTION)
+  const existing = await activeFirestore.collection(USERS_COLLECTION)
     .where('displayNameLower', '==', displayNameLower)
     .limit(1)
     .get()
@@ -303,7 +317,7 @@ export const setDisplayName = async (uid: string, displayName: string, photoURL?
     return { error: 'displayNameTaken' }
   }
 
-  const userRef = firestore.collection(USERS_COLLECTION).doc(uid)
+  const userRef = activeFirestore.collection(USERS_COLLECTION).doc(uid)
   const doc = await userRef.get()
 
   if (doc.exists) {
@@ -321,18 +335,24 @@ export const setDisplayName = async (uid: string, displayName: string, photoURL?
 }
 
 export const deleteUserStats = async (uid: string): Promise<void> => {
-  await firestore.collection(USERS_COLLECTION).doc(uid).delete()
+  if (!firestore) return
+  const activeFirestore = firestore
+
+  await activeFirestore.collection(USERS_COLLECTION).doc(uid).delete()
   userStatsCache.invalidate(uid)
   displayNameCache.invalidate(uid)
   rankedListCache.clear()
 }
 
 const getRankedList = async (minGames: number): Promise<RankedLeaderboardEntry[]> => {
+  if (!firestore) return []
+  const activeFirestore = firestore
+
   const cacheKey = `ranked:${minGames}`
   const cached = rankedListCache.get(cacheKey)
   if (cached) return cached
 
-  const snapshot = await firestore
+  const snapshot = await activeFirestore
     .collection(USERS_COLLECTION)
     .where('gamesPlayed', '>=', minGames)
     .get()
