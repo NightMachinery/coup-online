@@ -14,6 +14,7 @@ import { useTranslationContext } from "../../contexts/TranslationsContext"
 import { useNavigate } from "react-router"
 import { useNotificationsContext } from "../../contexts/NotificationsContext"
 import CoupTypography from '../utilities/CoupTypography'
+import { copyTextToClipboard } from '../../helpers/clipboard'
 
 function WaitingRoom() {
   const [addAiPlayerDialogOpen, setAddAiPlayerDialogOpen] = useState(false)
@@ -56,13 +57,21 @@ function WaitingRoom() {
           <Button
             variant="contained"
             startIcon={<ContentCopy />}
-            onClick={() => {
-              navigator.clipboard.writeText(inviteLink)
-              showNotification({
-                id: 'inviteLinkCopied',
-                message: t('inviteLinkCopied'),
-                severity: 'success'
-              })
+            onClick={async () => {
+              const copied = await copyTextToClipboard(inviteLink)
+              if (copied) {
+                showNotification({
+                  id: 'inviteLinkCopied',
+                  message: t('inviteLinkCopied'),
+                  severity: 'success'
+                })
+              } else {
+                showNotification({
+                  id: 'inviteLinkCopyFailed',
+                  message: 'Unable to copy automatically. Copy the URL from the address bar instead.',
+                  severity: 'warning'
+                })
+              }
             }}
           >
             {(t('copyInviteLink'))}
