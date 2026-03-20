@@ -2,10 +2,13 @@ import { Alert, Box, Button, CircularProgress, Grid, Link } from "@mui/material"
 import GameBoard from "../game/GameBoard"
 import WaitingRoom from "../game/WaitingRoom"
 import { useGameStateContext } from "../../contexts/GameStateContext"
-import { Link as RouterLink, useSearchParams } from "react-router"
+import { Link as RouterLink, useNavigate, useSearchParams } from "react-router"
 import { useTranslationContext } from "../../contexts/TranslationsContext"
 import { Visibility } from "@mui/icons-material"
 import CoupTypography from '../utilities/CoupTypography'
+import { useDisplayName } from '../../hooks/useDisplayName'
+import { useAuthContext } from '../../contexts/AuthContext'
+import { useEffect } from 'react'
 
 interface GameProps {
   leftDrawerOpen: boolean
@@ -15,10 +18,23 @@ interface GameProps {
 function Game({ leftDrawerOpen, rightDrawerOpen }: GameProps) {
   const { gameState, hasInitialStateLoaded } = useGameStateContext()
   const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { t } = useTranslationContext()
+  const { displayName, loading: displayNameLoading } = useDisplayName()
+  const { loading: authLoading } = useAuthContext()
   const roomId = searchParams.get('roomId')
 
-  if (roomId && !gameState && !hasInitialStateLoaded) {
+  useEffect(() => {
+    if (!roomId || !gameState || !hasInitialStateLoaded || authLoading || displayNameLoading) {
+      return
+    }
+
+    if (!gameState.selfPlayer && !displayName) {
+      navigate(`/join-game?roomId=${roomId}`, { replace: true })
+    }
+  }, [authLoading, displayName, displayNameLoading, gameState, hasInitialStateLoaded, navigate, roomId])
+
+  if (roomId && (authLoading || displayNameLoading || !hasInitialStateLoaded)) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 'var(--app-content-height)' }}>
         <CircularProgress size={50} />

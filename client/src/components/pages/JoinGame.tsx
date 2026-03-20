@@ -60,7 +60,7 @@ function JoinGame() {
             playerNameInputRef.current!.setAttribute('required', '')
             if (formRef.current!.checkValidity()) {
               const submittedPlayerName = visiblePlayerName.trim()
-              if (isLocalAuth) {
+              if (isLocalAuth || !user) {
                 await saveDisplayName(submittedPlayerName)
               }
               joinTrigger({
@@ -73,13 +73,19 @@ function JoinGame() {
             }
           } else if (buttonId === 'spectateGameButton') {
             playerNameInputRef.current!.removeAttribute('required')
-            if (formRef.current!.checkValidity()) spectateTrigger({
-              roomId: roomId.trim(),
-              playerId: getPlayerId(),
-              ...(visiblePlayerName.trim() && { spectatorName: visiblePlayerName.trim() }),
-              ...(user && { uid: user.uid }),
-              ...(user?.photoURL && { photoURL: user.photoURL }),
-            })
+            if (formRef.current!.checkValidity()) {
+              const submittedSpectatorName = visiblePlayerName.trim()
+              if (!user && submittedSpectatorName) {
+                await saveDisplayName(submittedSpectatorName)
+              }
+              spectateTrigger({
+                roomId: roomId.trim(),
+                playerId: getPlayerId(),
+                ...(submittedSpectatorName && { spectatorName: submittedSpectatorName }),
+                ...(user && { uid: user.uid }),
+                ...(user?.photoURL && { photoURL: user.photoURL }),
+              })
+            }
           } else {
             console.error('Unexpected button ID:', buttonId)
           }

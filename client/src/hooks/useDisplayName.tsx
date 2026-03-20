@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react'
 import { useAuthContext } from '../contexts/AuthContext'
 import { getBaseUrl } from '../helpers/api'
 import { readLocalAuthProfile, saveLocalAuthDisplayName } from '../helpers/localAuth'
+import { guestDisplayNameStorageKey } from '../helpers/localStorageKeys'
+
+const sanitizeDisplayName = (name: string | null | undefined) => {
+  const trimmed = name?.trim().slice(0, 10)
+  return trimmed ? trimmed : null
+}
+
+const readGuestDisplayName = () => sanitizeDisplayName(localStorage.getItem(guestDisplayNameStorageKey))
+
+const writeGuestDisplayName = (name: string) => {
+  const trimmed = sanitizeDisplayName(name)
+  if (trimmed) {
+    localStorage.setItem(guestDisplayNameStorageKey, trimmed)
+  } else {
+    localStorage.removeItem(guestDisplayNameStorageKey)
+  }
+  return trimmed
+}
 
 export function useDisplayName() {
   const { user, isLocalAuth } = useAuthContext()
@@ -10,7 +28,8 @@ export function useDisplayName() {
 
   useEffect(() => {
     if (!user?.uid) {
-      setDisplayName(null)
+      setDisplayName(readGuestDisplayName())
+      setLoading(false)
       return
     }
 
@@ -35,7 +54,10 @@ export function useDisplayName() {
   }, [isLocalAuth, user?.uid])
 
   const saveDisplayName = async (name: string): Promise<{ success: boolean; error?: string }> => {
-    if (!user) return { success: false, error: 'Not signed in' }
+    if (!user) {
+      setDisplayName(writeGuestDisplayName(name))
+      return { success: true }
+    }
 
     if (isLocalAuth) {
       const profile = saveLocalAuthDisplayName(name)

@@ -1,5 +1,6 @@
 export const playerIdStorageKey = 'coupPlayerId'
 export const localAuthProfileStorageKey = 'coupLocalAuthProfile'
+export const guestDisplayNameStorageKey = 'coupGuestDisplayName'
 export const activeColorModeStorageKey = 'coupActiveColorMode'
 export const confirmActionsStorageKey = 'coupConfirmActions'
 export const showBackgroundImageStorageKey = 'coupShowBackgroundImage'

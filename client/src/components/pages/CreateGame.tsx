@@ -73,7 +73,7 @@ function CreateGame() {
         onSubmit={async (event) => {
           event.preventDefault()
           const submittedPlayerName = visiblePlayerName.trim()
-          if (isLocalAuth) {
+          if (isLocalAuth || !user) {
             await saveDisplayName(submittedPlayerName)
           }
           trigger({
