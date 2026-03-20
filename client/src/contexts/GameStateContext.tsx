@@ -6,6 +6,8 @@ import { useSearchParams } from 'react-router'
 import { useWebSocketContext } from './WebSocketContext'
 import { getGameActionUrl } from '../helpers/api'
 import { useTranslationContext } from './TranslationsContext'
+import { useDisplayName } from '../hooks/useDisplayName'
+import { useAuthContext } from './AuthContext'
 
 type GameStateContextType = {
   gameState?: PublicGameState | undefined,
@@ -24,8 +26,18 @@ export function GameStateContextProvider({ children }: Readonly<{ children: Reac
   const [searchParams] = useSearchParams()
   const { socket, isConnected } = useWebSocketContext()
   const { language } = useTranslationContext()
+  const { displayName } = useDisplayName()
+  const { user } = useAuthContext()
 
   const roomId = searchParams.get('roomId')
+  const gameStateRequestParams = useMemo(() => ({
+    roomId: roomId ?? '',
+    playerId: getPlayerId(),
+    ...(displayName && { spectatorName: displayName }),
+    ...(user?.uid && { uid: user.uid }),
+    ...(user?.photoURL && { photoURL: user.photoURL }),
+    language
+  }), [displayName, language, roomId, user?.photoURL, user?.uid])
 
   const gameState = useMemo(() =>
     dehydratedGameState ? rehydratePublicGameState(dehydratedGameState) : undefined,
@@ -46,7 +58,14 @@ export function GameStateContextProvider({ children }: Readonly<{ children: Reac
 
   useSWR<void, Error>(
     roomId
-      ? `${getGameActionUrl(PlayerActions.gameState)}?roomId=${encodeURIComponent(roomId)}&playerId=${encodeURIComponent(getPlayerId())}&language=${encodeURIComponent(language)}`
+      ? `${getGameActionUrl(PlayerActions.gameState)}?${new URLSearchParams(
+        Object.entries(gameStateRequestParams).reduce((queryParams, [key, value]) => {
+          if (typeof value === 'string' && value.length) {
+            queryParams[key] = value
+          }
+          return queryParams
+        }, {} as Record<string, string>)
+      ).toString()}`
       : null,
     async function (input: RequestInfo, init?: RequestInit) {
       try {
@@ -73,14 +92,14 @@ export function GameStateContextProvider({ children }: Readonly<{ children: Reac
       console.error(error)
       setHasInitialStateLoaded(true)
     })
-    socket.emit(PlayerActions.gameState, { roomId, playerId: getPlayerId(), language })
+    socket.emit(PlayerActions.gameState, gameStateRequestParams)
 
     const intervalId = setInterval(() => {
-      socket.emit(PlayerActions.gameState, { roomId, playerId: getPlayerId(), language })
+      socket.emit(PlayerActions.gameState, gameStateRequestParams)
     }, 5000)
 
     return () => { clearInterval(intervalId) }
-  }, [roomId, socket, language, isConnected, setDehydratedGameStateIfChanged])
+  }, [roomId, socket, isConnected, gameStateRequestParams, setDehydratedGameStateIfChanged])
 
   const playersLeft = gameState?.players.filter(({ influenceCount }) => influenceCount)
   const gameIsOver = playersLeft?.length === 1

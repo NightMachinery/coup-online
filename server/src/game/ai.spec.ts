@@ -61,6 +61,7 @@ describe('ai', () => {
       chatMessages: [],
       lastEventTimestamp: chance.date(),
       isStarted: chance.bool(),
+      selfIsCreator: false,
       turn: chance.natural(),
       players: [],
       pendingInfluenceLoss: {},
@@ -367,6 +368,7 @@ describe('ai', () => {
           },
           settings: { eventLogRetentionTurns: 3, allowRevive: false },
           pendingInfluenceLoss: {},
+          selfIsCreator: false,
           deckCount: 11,
         }),
       ).toEqual({
@@ -408,6 +410,7 @@ describe('ai', () => {
           },
           settings: { eventLogRetentionTurns: 3, allowRevive: true },
           pendingInfluenceLoss: {},
+          selfIsCreator: false,
           deckCount: 11,
         }),
       ).toEqual({
@@ -458,6 +461,7 @@ describe('ai', () => {
         },
         settings: { eventLogRetentionTurns: 3, allowRevive: false },
         pendingInfluenceLoss: {},
+        selfIsCreator: false,
         deckCount: 11,
       })
 
@@ -506,6 +510,7 @@ describe('ai', () => {
         },
         settings: { eventLogRetentionTurns: 3, allowRevive: true },
         pendingInfluenceLoss: {},
+        selfIsCreator: false,
         deckCount: 11,
       })
 
@@ -560,6 +565,7 @@ describe('ai', () => {
           turnPlayer: 'hailey',
           settings: { eventLogRetentionTurns: 3, allowRevive: true },
           pendingInfluenceLoss: {},
+          selfIsCreator: false,
           deckCount: 11,
         }),
       ).toEqual({ response: Responses.Challenge })

@@ -29,6 +29,7 @@ import {
   InvalidPlayerCountError,
   PlayersMustHave2InfluencesError,
 } from './errors'
+import { clearRoomPresence, upsertRoomPresence } from './roomPresence'
 
 vi.mock('./storage')
 vi.mock('./compression')
@@ -91,6 +92,7 @@ describe('gameState', () => {
     vi.clearAllMocks()
     compressStringMock.mockImplementation((string) => string)
     decompressStringMock.mockImplementation((string) => string)
+    clearRoomPresence()
   })
 
   describe('getGameState', () => {
@@ -115,12 +117,22 @@ describe('gameState', () => {
     it('should get portion of game state that is accessible to player', () => {
       const gameState = getRandomGameState()
       const selfPlayer = chance.pickone(gameState.players)
+      const lobbyCreator = chance.pickone(gameState.players)
+      gameState.creatorPlayerId = lobbyCreator.id
+      upsertRoomPresence({
+        roomId: gameState.roomId,
+        playerId: lobbyCreator.id,
+        name: lobbyCreator.name
+      })
 
       const publicGameState: PublicGameState = {
         eventLogs: gameState.eventLogs,
         chatMessages: gameState.chatMessages,
         lastEventTimestamp: gameState.lastEventTimestamp,
         isStarted: gameState.isStarted,
+        selfIsCreator: selfPlayer.id === lobbyCreator.id,
+        creatorPlayerName: lobbyCreator.name,
+        creatorDisplayName: lobbyCreator.name,
         turn: gameState.turn,
         pendingInfluenceLoss: gameState.pendingInfluenceLoss,
         roomId: gameState.roomId,
@@ -151,6 +163,7 @@ describe('gameState', () => {
           grudges: player.grudges,
         })),
         settings: gameState.settings,
+        ...(selfPlayer.id === lobbyCreator.id && { spectators: [] }),
         ...(gameState.pendingAction && {
           pendingAction: gameState.pendingAction,
         }),
@@ -167,6 +180,36 @@ describe('gameState', () => {
       expect(
         getPublicGameState({ gameState, playerId: selfPlayer.id }),
       ).toStrictEqual(publicGameState)
+    })
+
+    it('should expose spectators only to the connected creator', () => {
+      const gameState = getRandomGameState({ playersCount: 2 })
+      const [creator, otherPlayer] = gameState.players
+      gameState.creatorPlayerId = creator.id
+
+      upsertRoomPresence({
+        roomId: gameState.roomId,
+        playerId: creator.id,
+        name: creator.name
+      })
+      upsertRoomPresence({
+        roomId: gameState.roomId,
+        playerId: chance.guid(),
+        name: 'Spectator Sam'
+      })
+
+      expect(getPublicGameState({ gameState, playerId: creator.id })).toMatchObject({
+        selfIsCreator: true,
+        creatorPlayerName: creator.name,
+        creatorDisplayName: creator.name,
+        spectators: [{ name: 'Spectator Sam' }]
+      })
+      expect(getPublicGameState({ gameState, playerId: otherPlayer.id })).toMatchObject({
+        selfIsCreator: false,
+        creatorPlayerName: creator.name,
+        creatorDisplayName: creator.name,
+      })
+      expect(getPublicGameState({ gameState, playerId: otherPlayer.id }).spectators).toBeUndefined()
     })
   })
 

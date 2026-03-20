@@ -30,7 +30,7 @@ function JoinGame() {
   }>({ action: PlayerActions.joinGame, callback: navigateToRoom })
 
   const { trigger: spectateTrigger, isMutating: spectateIsMutating } = useGameMutation<{
-    roomId: string, playerId: string
+    roomId: string, playerId: string, spectatorName?: string, uid?: string, photoURL?: string
   }>({ action: PlayerActions.gameState, callback: navigateToRoom })
 
   const visiblePlayerName = isLocalAuth
@@ -75,7 +75,10 @@ function JoinGame() {
             playerNameInputRef.current!.removeAttribute('required')
             if (formRef.current!.checkValidity()) spectateTrigger({
               roomId: roomId.trim(),
-              playerId: getPlayerId()
+              playerId: getPlayerId(),
+              ...(visiblePlayerName.trim() && { spectatorName: visiblePlayerName.trim() }),
+              ...(user && { uid: user.uid }),
+              ...(user?.photoURL && { photoURL: user.photoURL }),
             })
           } else {
             console.error('Unexpected button ID:', buttonId)

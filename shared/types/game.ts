@@ -24,6 +24,7 @@ export enum PlayerActions {
   addAiPlayer = 'addAiPlayer',
   removeFromGame = 'removeFromGame',
   startGame = 'startGame',
+  setPlayerController = 'setPlayerController',
   resetGame = 'resetGame',
   resetGameRequest = 'resetGameRequest',
   resetGameRequestCancel = 'resetGameRequestCancel',
@@ -135,6 +136,11 @@ export enum Responses {
   Block = 'Block',
 }
 
+export enum PlayerControllers {
+  Bot = 'bot',
+  Human = 'human',
+}
+
 export enum EventMessages {
   ActionConfirm = 'ActionConfirm',
   ActionPending = 'ActionPending',
@@ -152,6 +158,8 @@ export enum EventMessages {
   PlayerLostInfluence = 'PlayerLostInfluence',
   PlayerReplacedInfluence = 'PlayerReplacedInfluence',
   PlayerReplacedWithAi = 'PlayerReplacedWithAi',
+  PlayerControllerSetToBot = 'PlayerControllerSetToBot',
+  PlayerControllerAssignedToHuman = 'PlayerControllerAssignedToHuman',
 }
 
 export type EventMessage = {
@@ -211,6 +219,13 @@ export type DehydratedPublicPlayer = Omit<
   unclaimedInfluences: Influences[];
 };
 
+export type Spectator = {
+  id: string;
+  name: string;
+  uid?: string;
+  photoURL?: string;
+};
+
 export type GameSettings = {
   eventLogRetentionTurns: number;
   allowRevive: boolean;
@@ -265,6 +280,7 @@ export type GameState = {
   eventLogs: EventMessage[];
   chatMessages: ChatMessage[];
   lastEventTimestamp: Date;
+  creatorPlayerId?: string;
   isStarted: boolean;
   availablePlayerColors: string[];
   players: Player[];
@@ -332,6 +348,10 @@ export type PublicGameState = Pick<
     players: PublicPlayer[];
     selfPlayer?: Player;
     deckCount: number;
+    selfIsCreator: boolean;
+    creatorPlayerName?: string;
+    creatorDisplayName?: string;
+    spectators?: Spectator[];
   };
 
 export type DehydratedPublicGameState = Omit<

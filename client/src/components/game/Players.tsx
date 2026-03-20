@@ -1,4 +1,4 @@
-import { Badge, Button, Grid, Paper, Tooltip, Typography, useTheme } from "@mui/material"
+import { Badge, Box, Button, Grid, MenuItem, Paper, TextField, Tooltip, Typography, useTheme } from "@mui/material"
 import { colord } from 'colord'
 import { useGameStateContext } from "../../contexts/GameStateContext"
 import { Close, MonetizationOn } from "@mui/icons-material"
@@ -6,19 +6,28 @@ import OverflowTooltip from "../utilities/OverflowTooltip"
 import InfluenceIcon from "../icons/InfluenceIcon"
 import { LIGHT_COLOR_MODE } from "../../contexts/MaterialThemeContext"
 import { getPlayerId, getWaitingOnPlayers } from "../../helpers/players"
-import { PlayerActions } from "@shared"
+import { PlayerActions, PlayerControllers } from "@shared"
 import useGameMutation from "../../hooks/useGameMutation"
 import Bot from "../icons/Bot"
 import { useTranslationContext } from "../../contexts/TranslationsContext"
+import { useState } from "react"
 
 function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }>) {
   const { gameState } = useGameStateContext()
   const { t } = useTranslationContext()
   const theme = useTheme()
+  const [selectedSpectatorIds, setSelectedSpectatorIds] = useState<Record<string, string>>({})
 
   const { trigger, isMutating } = useGameMutation<{
     roomId: string, playerId: string, playerName: string
   }>({ action: PlayerActions.removeFromGame })
+  const controllerMutation = useGameMutation<{
+    roomId: string
+    playerId: string
+    targetPlayerName: string
+    targetController: PlayerControllers
+    spectatorId?: string
+  }>({ action: PlayerActions.setPlayerController })
 
   if (!gameState) {
     return null
@@ -27,6 +36,8 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
   const colorModeFactor = theme.palette.mode === LIGHT_COLOR_MODE ? -1 : 1
   const waitingOnPlayers = getWaitingOnPlayers(gameState)
   const humanPlayers = gameState.players.filter(({ ai }) => !ai)
+  const creatorCanManageSeats = gameState.isStarted && gameState.selfIsCreator && !inWaitingRoom
+  const availableSpectators = gameState.spectators ?? []
 
   return (
     <Grid container justifyContent="center" spacing={3}>
@@ -40,6 +51,9 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
             ...deadInfluences,
             ...Array.from({ length: influenceCount }, () => undefined)
           ] : Array.from({ length: 2 }, () => undefined)
+          const selectedSpectatorId = availableSpectators.some(({ id }) => id === selectedSpectatorIds[name])
+            ? selectedSpectatorIds[name]
+            : ''
 
           return (
             <Badge
@@ -158,6 +172,71 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
                     )
                   })}
                 </Grid>
+                {creatorCanManageSeats && influenceCount > 0 && (
+                  <Box mt={1} display="grid" gap={1}>
+                    {!ai && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={controllerMutation.isMutating}
+                        onClick={() => {
+                          controllerMutation.trigger({
+                            roomId: gameState.roomId,
+                            playerId: getPlayerId(),
+                            targetPlayerName: name,
+                            targetController: PlayerControllers.Bot
+                          })
+                        }}
+                      >
+                        {t('switchToBot')}
+                      </Button>
+                    )}
+                    {ai && (
+                      <>
+                        <TextField
+                          select
+                          size="small"
+                          label={t('assignToSpectator')}
+                          disabled={!availableSpectators.length || controllerMutation.isMutating}
+                          value={selectedSpectatorId}
+                          onChange={(event) => {
+                            setSelectedSpectatorIds((current) => ({
+                              ...current,
+                              [name]: event.target.value
+                            }))
+                          }}
+                        >
+                          {availableSpectators.map((spectator) => (
+                            <MenuItem key={spectator.id} value={spectator.id}>
+                              {spectator.name}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          disabled={controllerMutation.isMutating || !selectedSpectatorId}
+                          onClick={() => {
+                            controllerMutation.trigger({
+                              roomId: gameState.roomId,
+                              playerId: getPlayerId(),
+                              targetPlayerName: name,
+                              targetController: PlayerControllers.Human,
+                              spectatorId: selectedSpectatorId
+                            })
+                          }}
+                        >
+                          {t('assignToSpectator')}
+                        </Button>
+                        {!availableSpectators.length && (
+                          <Typography variant="caption" sx={{ color: cardTextColor }}>
+                            {t('noConnectedSpectators')}
+                          </Typography>
+                        )}
+                      </>
+                    )}
+                  </Box>
+                )}
               </Paper>
             </Badge>
           )

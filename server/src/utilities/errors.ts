@@ -103,6 +103,18 @@ export class DifferentPlayerNameError extends GameMutationInputError {
   }
 }
 
+export class ConnectedSpectatorRequiredError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'connectedSpectatorRequired',
+      language
+    })
+  }
+}
+
 export class EveryonePassedWithPendingDecisionError extends GameMutationInputError {
   getMessage: (language: AvailableLanguageCode) => string
 
@@ -267,6 +279,54 @@ export class NoDeadInfluencesError extends GameMutationInputError {
     super()
     this.getMessage = (language) => translate({
       key: 'noDeadInfluences',
+      language
+    })
+  }
+}
+
+export class OnlyLobbyCreatorCanStartGameError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'onlyLobbyCreatorCanStartGame',
+      language
+    })
+  }
+}
+
+export class OnlyLobbyCreatorCanSetPlayerControllerError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'onlyLobbyCreatorCanSetPlayerController',
+      language
+    })
+  }
+}
+
+export class PlayerAlreadyBotControlledError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'playerAlreadyBotControlled',
+      language
+    })
+  }
+}
+
+export class PlayerAlreadyHumanControlledError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'playerAlreadyHumanControlled',
       language
     })
   }

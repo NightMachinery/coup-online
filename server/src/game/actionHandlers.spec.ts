@@ -1,10 +1,11 @@
 import { vi, type MockInstance, describe, it, expect, afterEach } from 'vitest'
 import Chance from 'chance'
-import { Actions, Influences, Responses } from '../../../shared/types/game'
+import { Actions, EventMessages, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
 import {
   actionChallengeResponseHandler,
   actionHandler,
   actionResponseHandler,
+  addAiPlayerHandler,
   blockChallengeResponseHandler,
   blockResponseHandler,
   createGameHandler,
@@ -14,10 +15,11 @@ import {
   resetGameHandler,
   resetGameRequestCancelHandler,
   resetGameRequestHandler,
+  setPlayerControllerHandler,
   startGameHandler,
 } from './actionHandlers'
 import { getValue, setValue } from '../utilities/storage'
-import { getGameState, mutateGameState } from '../utilities/gameState'
+import { getGameState, getPublicGameState, mutateGameState } from '../utilities/gameState'
 import * as identifiers from '../utilities/identifiers'
 import {
   ActionNotChallengeableError,
@@ -25,17 +27,23 @@ import {
   ClaimedInfluenceAlreadyConfirmedError,
   ClaimedInfluenceInvalidError,
   ClaimedInfluenceRequiredError,
+  ConnectedSpectatorRequiredError,
   DifferentPlayerNameError,
   GameInProgressError,
   GameNotInProgressError,
   InsufficientCoinsError,
   InvalidActionAt10CoinsError,
   MissingInfluenceError,
+  OnlyLobbyCreatorCanSetPlayerControllerError,
+  OnlyLobbyCreatorCanStartGameError,
+  PlayerAlreadyBotControlledError,
+  PlayerAlreadyHumanControlledError,
   PlayerNotInGameError,
   RoomIdAlreadyExistsError,
   TargetPlayerIsSelfError,
   TargetPlayerRequiredForActionError,
 } from '../utilities/errors'
+import { clearRoomPresence, upsertRoomPresence } from '../utilities/roomPresence'
 
 vi.mock('../utilities/storage')
 
@@ -66,6 +74,7 @@ describe('actionHandlers', () => {
   let generateRoomIdSpy: MockInstance | undefined
   afterEach(() => {
     generateRoomIdSpy?.mockRestore()
+    clearRoomPresence()
   })
 
   describe('game scenarios', () => {
@@ -98,7 +107,7 @@ describe('actionHandlers', () => {
       }
       await startGameHandler({
         roomId,
-        playerId: chance.pickone(players).playerId,
+        playerId: players[0].playerId,
       })
 
       await mutateGameState(await getGameState(roomId), (state) => {
@@ -233,10 +242,266 @@ describe('actionHandlers', () => {
         }),
       ).rejects.toThrow(PlayerNotInGameError)
 
+      await expect(
+        startGameHandler({ roomId, playerId: hailey.playerId }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
+      await removeFromGameHandler({
+        roomId,
+        playerId: hailey.playerId,
+        playerName: harper.playerName,
+      })
       await startGameHandler({ roomId, playerId: hailey.playerId })
       await expect(
-        startGameHandler({ roomId, playerId: harper.playerId }),
+        startGameHandler({ roomId, playerId: hailey.playerId }),
       ).rejects.toThrow(GameInProgressError)
+    })
+
+    it('should preserve creator-only start permissions across resets', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: { eventLogRetentionTurns: 100, allowRevive: true },
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+
+      await expect(
+        startGameHandler({ roomId, playerId: hailey.playerId }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
+
+      await startGameHandler({ roomId, playerId: harper.playerId })
+
+      await mutateGameState(await getGameState(roomId), (state) => {
+        state.players
+          .filter(({ id }) => id !== harper.playerId)
+          .forEach((player) =>
+            player.deadInfluences.push(...player.influences.splice(0)),
+          )
+        state.turnPlayer = harper.playerName
+      })
+
+      await resetGameHandler({ roomId, playerId: hailey.playerId })
+
+      await expect(
+        startGameHandler({ roomId, playerId: hailey.playerId }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
+      await startGameHandler({ roomId, playerId: harper.playerId })
+    })
+
+    it('should restore creator start permissions when creator rejoins', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: { eventLogRetentionTurns: 100, allowRevive: true },
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+      await joinGameHandler({ roomId, ...marissa })
+
+      await removeFromGameHandler({
+        roomId,
+        playerId: hailey.playerId,
+        playerName: harper.playerName,
+      })
+
+      await joinGameHandler({ roomId, ...harper })
+
+      await expect(
+        startGameHandler({ roomId, playerId: hailey.playerId }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
+      await startGameHandler({ roomId, playerId: harper.playerId })
+    })
+
+    it('should allow any player to start legacy rooms with no creator recorded', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: { eventLogRetentionTurns: 100, allowRevive: true },
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+
+      await mutateGameState(await getGameState(roomId), (state) => {
+        delete state.creatorPlayerId
+      })
+
+      await startGameHandler({ roomId, playerId: hailey.playerId })
+    })
+
+    it('should let the creator switch a human player to bot control mid-game', async () => {
+      const roomId = await setupTestGame([harper, hailey, marissa])
+
+      await setPlayerControllerHandler({
+        roomId,
+        playerId: harper.playerId,
+        targetPlayerName: hailey.playerName,
+        targetController: PlayerControllers.Bot,
+      })
+
+      const gameState = await getGameState(roomId)
+      const switchedPlayer = gameState.players.find(
+        ({ name }) => name === hailey.playerName,
+      )!
+
+      expect(switchedPlayer.name).toBe(hailey.playerName)
+      expect(switchedPlayer.ai).toBe(true)
+      expect(switchedPlayer.id).not.toBe(hailey.playerId)
+      expect(switchedPlayer.personality).toBeTruthy()
+      expect(switchedPlayer.personalityHidden).toBe(true)
+      expect(gameState.eventLogs.at(-1)).toEqual({
+        event: EventMessages.PlayerControllerSetToBot,
+        primaryPlayer: hailey.playerName,
+        turn: gameState.turn,
+      })
+
+      await expect(
+        actionHandler({
+          roomId,
+          playerId: hailey.playerId,
+          action: Actions.Income,
+        }),
+      ).rejects.toThrow(PlayerNotInGameError)
+    })
+
+    it('should let the creator assign an ai seat to a connected spectator', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: { eventLogRetentionTurns: 100, allowRevive: true },
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+      await addAiPlayerHandler({
+        roomId,
+        playerId: harper.playerId,
+        playerName: david.playerName,
+      })
+      await startGameHandler({ roomId, playerId: harper.playerId })
+
+      upsertRoomPresence({
+        roomId,
+        playerId: marissa.playerId,
+        name: marissa.playerName,
+      })
+
+      const creatorState = getPublicGameState({
+        gameState: await getGameState(roomId),
+        playerId: harper.playerId,
+      })
+      const spectatorId = creatorState.spectators?.find(
+        ({ name }) => name === marissa.playerName,
+      )?.id
+
+      expect(spectatorId).toBeTruthy()
+
+      await setPlayerControllerHandler({
+        roomId,
+        playerId: harper.playerId,
+        targetPlayerName: david.playerName,
+        targetController: PlayerControllers.Human,
+        spectatorId: spectatorId!,
+      })
+
+      const gameState = await getGameState(roomId)
+      const assignedSeat = gameState.players.find(
+        ({ name }) => name === david.playerName,
+      )!
+
+      expect(assignedSeat.name).toBe(david.playerName)
+      expect(assignedSeat.ai).toBe(false)
+      expect(assignedSeat.id).toBe(marissa.playerId)
+      expect(assignedSeat.personality).toBeUndefined()
+      expect(assignedSeat.personalityHidden).toBeUndefined()
+      expect(gameState.eventLogs.at(-1)).toEqual({
+        event: EventMessages.PlayerControllerAssignedToHuman,
+        primaryPlayer: david.playerName,
+        secondaryPlayer: marissa.playerName,
+        turn: gameState.turn,
+      })
+      expect(
+        getPublicGameState({
+          gameState,
+          playerId: marissa.playerId,
+        }).selfPlayer?.name,
+      ).toBe(david.playerName)
+    })
+
+    it('should allow the creator to keep switching seats while spectating', async () => {
+      const roomId = await setupTestGame([harper, hailey, marissa])
+
+      await setPlayerControllerHandler({
+        roomId,
+        playerId: harper.playerId,
+        targetPlayerName: harper.playerName,
+        targetController: PlayerControllers.Bot,
+      })
+
+      await expect(
+        setPlayerControllerHandler({
+          roomId,
+          playerId: harper.playerId,
+          targetPlayerName: marissa.playerName,
+          targetController: PlayerControllers.Bot,
+        }),
+      ).resolves.toEqual({ roomId, playerId: harper.playerId })
+
+      const gameState = await getGameState(roomId)
+      expect(
+        gameState.players.find(({ name }) => name === marissa.playerName)?.ai,
+      ).toBe(true)
+    })
+
+    it('should reject invalid controller switch requests', async () => {
+      const roomId = await setupTestGame([harper, hailey, marissa])
+
+      await expect(
+        setPlayerControllerHandler({
+          roomId,
+          playerId: hailey.playerId,
+          targetPlayerName: marissa.playerName,
+          targetController: PlayerControllers.Bot,
+        }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanSetPlayerControllerError)
+
+      await setPlayerControllerHandler({
+        roomId,
+        playerId: harper.playerId,
+        targetPlayerName: marissa.playerName,
+        targetController: PlayerControllers.Bot,
+      })
+
+      await expect(
+        setPlayerControllerHandler({
+          roomId,
+          playerId: harper.playerId,
+          targetPlayerName: marissa.playerName,
+          targetController: PlayerControllers.Bot,
+        }),
+      ).rejects.toThrow(PlayerAlreadyBotControlledError)
+
+      await expect(
+        setPlayerControllerHandler({
+          roomId,
+          playerId: harper.playerId,
+          targetPlayerName: hailey.playerName,
+          targetController: PlayerControllers.Human,
+        }),
+      ).rejects.toThrow(PlayerAlreadyHumanControlledError)
+
+      await expect(
+        setPlayerControllerHandler({
+          roomId,
+          playerId: harper.playerId,
+          targetPlayerName: marissa.playerName,
+          targetController: PlayerControllers.Human,
+        }),
+      ).rejects.toThrow(ConnectedSpectatorRequiredError)
+
+      await expect(
+        setPlayerControllerHandler({
+          roomId,
+          playerId: harper.playerId,
+          targetPlayerName: marissa.playerName,
+          targetController: PlayerControllers.Human,
+          spectatorId: chance.guid(),
+        }),
+      ).rejects.toThrow(ConnectedSpectatorRequiredError)
     })
 
     it('creating new game can not wipe out existing game when room id conflicts', async () => {

@@ -223,6 +223,7 @@ export const removePlayerFromGame = (state: GameState, playerName: string) => {
 
 export const createNewGame = async (roomId: string, playerId: string, playerName: string, gameSettings: GameSettings, uid?: string, photoURL?: string) => {
   const newGameState = getNewGameState(roomId, gameSettings)
+  newGameState.creatorPlayerId = playerId
   addPlayerToGame({ state: newGameState, playerId, playerName, ...(uid ? { uid } : {}), ...(photoURL ? { photoURL } : {}) })
   await createGameState(roomId, newGameState)
 }
@@ -253,6 +254,9 @@ export const humanOpponentsRemain = (gameState: GameState, player: Player) =>
 export const resetGame = async (roomId: string) => {
   const oldGameState = await getGameState(roomId)
   const newGameState = getNewGameState(roomId, oldGameState.settings)
+  if (oldGameState.creatorPlayerId !== undefined) {
+    newGameState.creatorPlayerId = oldGameState.creatorPlayerId
+  }
   newGameState.players = oldGameState.players.map((player) => ({
     ...player,
     coins: 2,

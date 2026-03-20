@@ -33,6 +33,10 @@ function WaitingRoom() {
   }
 
   const inviteLink = `${window.location.origin}/join-game?roomId=${gameState.roomId}`
+  const creatorDisplayName = gameState.creatorDisplayName
+  const selfIsCreator = gameState.selfIsCreator
+  const creatorIsPresent = !!creatorDisplayName
+  const startDisabled = gameState.players.length < 2 || (creatorIsPresent && !selfIsCreator)
 
   return (
     <>
@@ -77,7 +81,7 @@ function WaitingRoom() {
             {(t('copyInviteLink'))}
           </Button>
         </Grid>
-        {!!gameState.selfPlayer && (
+        {(!!gameState.selfPlayer || selfIsCreator) && (
           <Grid>
             <Button
               variant="contained"
@@ -91,7 +95,7 @@ function WaitingRoom() {
             </Button>
           </Grid>
         )}
-        {!!gameState.selfPlayer && (
+        {(!!gameState.selfPlayer || selfIsCreator) && (
           <Grid>
             <Button
               variant='contained'
@@ -101,7 +105,7 @@ function WaitingRoom() {
                   playerId: getPlayerId()
                 })
               }}
-              disabled={gameState.players.length < 2}
+              disabled={startDisabled}
               loading={isMutating}
               startIcon={<PlayArrow />}
             >
@@ -111,6 +115,14 @@ function WaitingRoom() {
               {gameState.players.length < 2 && (
                 <CoupTypography mt={2} addTextShadow>
                   {t('addPlayersToStartGame')}
+                </CoupTypography>
+              )}
+              {gameState.players.length >= 2 && creatorIsPresent && !selfIsCreator && (
+                <CoupTypography mt={2} addTextShadow>
+                  {t('onlyLobbyCreatorCanStartGame', {
+                    primaryPlayer: creatorDisplayName,
+                    gameState
+                  })}
                 </CoupTypography>
               )}
               {gameState.players.length === 2 && (

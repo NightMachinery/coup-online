@@ -3,8 +3,8 @@ import express, { NextFunction, Request, Response } from 'express'
 import { json } from 'body-parser'
 import cors from 'cors'
 import Joi, { ObjectSchema } from 'joi'
-import { Actions, Influences, Responses, DehydratedPublicGameState, PlayerActions, ServerEvents, AiPersonality, GameSettings } from '../shared/types/game'
-import { actionChallengeResponseHandler, actionHandler, actionResponseHandler, addAiPlayerHandler, blockChallengeResponseHandler, blockResponseHandler, checkAutoMoveHandler, createGameHandler, setChatMessageDeletedHandler, getGameStateHandler, joinGameHandler, loseInfluencesHandler, removeFromGameHandler, resetGameHandler, resetGameRequestCancelHandler, resetGameRequestHandler, sendChatMessageHandler, startGameHandler, setEmojiOnChatMessageHandler, forfeitGameHandler } from './src/game/actionHandlers'
+import { Actions, Influences, Responses, DehydratedPublicGameState, PlayerActions, ServerEvents, AiPersonality, GameSettings, PlayerControllers } from '../shared/types/game'
+import { actionChallengeResponseHandler, actionHandler, actionResponseHandler, addAiPlayerHandler, blockChallengeResponseHandler, blockResponseHandler, checkAutoMoveHandler, createGameHandler, setChatMessageDeletedHandler, getGameStateHandler, joinGameHandler, loseInfluencesHandler, removeFromGameHandler, resetGameHandler, resetGameRequestCancelHandler, resetGameRequestHandler, sendChatMessageHandler, setPlayerControllerHandler, startGameHandler, setEmojiOnChatMessageHandler, forfeitGameHandler } from './src/game/actionHandlers'
 import { GameMutationInputError, WrongPlayerIdOnSocketError } from './src/utilities/errors'
 import { Server as ioServer, Socket } from 'socket.io'
 import { getGameState, getPublicGameState } from './src/utilities/gameState'
@@ -60,6 +60,12 @@ const playerNameRule = Joi.string().min(1).max(10).required().custom((value: str
   }
   return value
 })
+const optionalPlayerNameRule = Joi.string().min(1).max(10).optional().custom((value: string) => {
+  if (containsProfanity(value)) {
+    throw new Error('inappropriateDisplayName')
+  }
+  return value
+})
 const languageRule = Joi.string().valid(...Object.values(AvailableLanguageCode)).required()
 
 const validateExpressRequest = (schema: ObjectSchema, requestProperty: 'body' | 'query') => {
@@ -95,14 +101,20 @@ const eventHandlers: {
       parseParams: (req) => {
         const roomId: string = req.query.roomId as string
         const playerId: string = req.query.playerId as string
+        const spectatorName: string | undefined = req.query.spectatorName as string | undefined
         const language: AvailableLanguageCode = req.query.language as AvailableLanguageCode
-        return { roomId, playerId, language }
+        const uid: string | undefined = req.query.uid as string | undefined
+        const photoURL: string | undefined = req.query.photoURL as string | undefined
+        return { roomId, playerId, spectatorName, uid, photoURL, language }
       },
       validator: validateExpressQuery
     },
     joiSchema: Joi.object().keys({
       roomId: Joi.string().required(),
       playerId: Joi.string().required(),
+      spectatorName: optionalPlayerNameRule,
+      uid: Joi.string().optional(),
+      photoURL: Joi.string().uri().optional(),
       language: languageRule
     })
   },
@@ -220,6 +232,30 @@ const eventHandlers: {
     joiSchema: Joi.object().keys({
       roomId: Joi.string().required(),
       playerId: Joi.string().required(),
+      language: languageRule
+    })
+  },
+  [PlayerActions.setPlayerController]: {
+    handler: setPlayerControllerHandler,
+    express: {
+      method: 'post',
+      parseParams: (req) => {
+        const roomId: string = req.body.roomId
+        const playerId: string = req.body.playerId
+        const targetPlayerName: string = req.body.targetPlayerName.trim()
+        const targetController: PlayerControllers = req.body.targetController
+        const spectatorId: string | undefined = req.body.spectatorId
+        const language: AvailableLanguageCode = req.body.language
+        return { roomId, playerId, targetPlayerName, targetController, spectatorId, language }
+      },
+      validator: validateExpressBody
+    },
+    joiSchema: Joi.object().keys({
+      roomId: Joi.string().required(),
+      playerId: Joi.string().required(),
+      targetPlayerName: playerNameRule,
+      targetController: Joi.string().valid(...Object.values(PlayerControllers)).required(),
+      spectatorId: Joi.string().guid().optional(),
       language: languageRule
     })
   },

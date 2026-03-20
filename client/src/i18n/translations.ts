@@ -76,6 +76,9 @@ export type Translations = ActionMessages &
     [EventMessages.PlayerLostInfluence]: TranslationsForString
     [EventMessages.PlayerReplacedInfluence]: TranslationsForString
     [EventMessages.PlayerReplacedWithAi]: TranslationsForString
+    [EventMessages.PlayerControllerSetToBot]: TranslationsForString
+    [EventMessages.PlayerControllerAssignedToHuman]: TranslationsForString
+    assignToSpectator: TranslationsForString
     forfeit: TranslationsForString
     forfeitConfirmationMessage: TranslationsForString
     forfeitConfirmationTitle: TranslationsForString
@@ -213,6 +216,7 @@ export type Translations = ActionMessages &
     fastestWin: TranslationsForString
     turns: TranslationsForString
     noAchievementsYet: TranslationsForString
+    onlyLobbyCreatorCanStartGame: TranslationsForString
     headToHead: TranslationsForString
     opponent: TranslationsForString
     player: TranslationsForString
@@ -222,6 +226,7 @@ export type Translations = ActionMessages &
     // Display name
     displayName: TranslationsForString
     nameFromProfile: TranslationsForString
+    noConnectedSpectators: TranslationsForString
     setDisplayName: TranslationsForString
     changeDisplayName: TranslationsForString
     inappropriateDisplayName: TranslationsForString
@@ -229,6 +234,7 @@ export type Translations = ActionMessages &
     somethingWentWrong: TranslationsForString
     tryAgain: TranslationsForString
     save: TranslationsForString
+    switchToBot: TranslationsForString
     deleteAccount: TranslationsForString
     deleteAccountConfirmTitle: TranslationsForString
     deleteAccountConfirmMessage: TranslationsForString
@@ -1174,6 +1180,33 @@ const translations: Translations = {
     'it-IT': '{{primaryPlayer}} è stato sostituito da un giocatore IA',
     'pt-BR': '{{primaryPlayer}} foi substituído por um jogador de IA',
   },
+  [EventMessages.PlayerControllerSetToBot]: {
+    'de-DE': '{{primaryPlayer}} wird jetzt von einem Bot gesteuert',
+    'en-US': '{{primaryPlayer}} is now bot-controlled',
+    'es-MX': '{{primaryPlayer}} ahora está controlado por un bot',
+    'fr-FR': '{{primaryPlayer}} est maintenant contrôlé par un bot',
+    'hi-IN': '{{primaryPlayer}} अब बॉट द्वारा नियंत्रित है',
+    'it-IT': '{{primaryPlayer}} ora è controllato da un bot',
+    'pt-BR': '{{primaryPlayer}} agora é controlado por um bot',
+  },
+  [EventMessages.PlayerControllerAssignedToHuman]: {
+    'de-DE': '{{secondaryPlayer}} steuert jetzt {{primaryPlayer}}',
+    'en-US': '{{secondaryPlayer}} now controls {{primaryPlayer}}',
+    'es-MX': '{{secondaryPlayer}} ahora controla a {{primaryPlayer}}',
+    'fr-FR': '{{secondaryPlayer}} contrôle maintenant {{primaryPlayer}}',
+    'hi-IN': '{{secondaryPlayer}} अब {{primaryPlayer}} को नियंत्रित करता है',
+    'it-IT': '{{secondaryPlayer}} ora controlla {{primaryPlayer}}',
+    'pt-BR': '{{secondaryPlayer}} agora controla {{primaryPlayer}}',
+  },
+  assignToSpectator: {
+    'de-DE': 'An Zuschauer geben',
+    'en-US': 'Assign to Spectator',
+    'es-MX': 'Asignar a espectador',
+    'fr-FR': 'Assigner à un spectateur',
+    'hi-IN': 'दर्शक को सौंपें',
+    'it-IT': 'Assegna a spettatore',
+    'pt-BR': 'Atribuir ao espectador',
+  },
   fastestWin: {
     'de-DE': 'Schnellster Sieg',
     'en-US': 'Fastest Win',
@@ -1574,6 +1607,24 @@ const translations: Translations = {
     'hi-IN': 'अभी तक कोई उपलब्धि नहीं',
     'it-IT': 'Nessun obiettivo raggiunto',
     'pt-BR': 'Nenhuma conquista ainda',
+  },
+  noConnectedSpectators: {
+    'de-DE': 'Keine verbundenen Zuschauer verfügbar',
+    'en-US': 'No connected spectators available',
+    'es-MX': 'No hay espectadores conectados disponibles',
+    'fr-FR': 'Aucun spectateur connecté disponible',
+    'hi-IN': 'कोई जुड़ा हुआ दर्शक उपलब्ध नहीं है',
+    'it-IT': 'Nessuno spettatore connesso disponibile',
+    'pt-BR': 'Nenhum espectador conectado disponível',
+  },
+  onlyLobbyCreatorCanStartGame: {
+    'de-DE': 'Nur {{primaryPlayer}} kann das Spiel starten',
+    'en-US': 'Only {{primaryPlayer}} can start the game',
+    'es-MX': 'Solo {{primaryPlayer}} puede iniciar el juego',
+    'fr-FR': 'Seul {{primaryPlayer}} peut démarrer la partie',
+    'hi-IN': 'केवल {{primaryPlayer}} ही खेल शुरू कर सकता है',
+    'it-IT': 'Solo {{primaryPlayer}} può avviare la partita',
+    'pt-BR': 'Somente {{primaryPlayer}} pode iniciar o jogo',
   },
   noChatMessages: {
     'de-DE': 'Keine Chat-Nachrichten',
@@ -2213,6 +2264,15 @@ const translations: Translations = {
     'hi-IN': 'सहेजें',
     'it-IT': 'Salva',
     'pt-BR': 'Salvar',
+  },
+  switchToBot: {
+    'de-DE': 'Zu Bot wechseln',
+    'en-US': 'Switch to Bot',
+    'es-MX': 'Cambiar a bot',
+    'fr-FR': 'Passer au bot',
+    'hi-IN': 'बॉट में बदलें',
+    'it-IT': 'Passa a bot',
+    'pt-BR': 'Trocar para bot',
   },
   send: {
     'de-DE': 'Senden',

@@ -9,6 +9,7 @@ import { MAX_PLAYER_COUNT } from '../../../shared/helpers/playerCount'
 import { GAME_STATE_TTL_SECONDS } from '../../../shared/helpers/constants'
 import { getCountOfEachInfluence } from './deck'
 import { recordGameStats } from './stats'
+import { getPublicSpectatorsForRoom, getRoomPresence } from './roomPresence'
 
 export const getGameState = async (
   roomId: string
@@ -24,10 +25,31 @@ export const getGameState = async (
   return rehydrateGameState(state)
 }
 
+export const getLobbyCreator = ({ gameState }: {
+  gameState: Pick<GameState, 'creatorPlayerId' | 'players'>
+}) => (
+  gameState.creatorPlayerId
+    ? gameState.players.find(({ id }) => id === gameState.creatorPlayerId)
+    : undefined
+)
+
+export const getConnectedLobbyCreatorPresence = ({ gameState }: {
+  gameState: Pick<GameState, 'creatorPlayerId' | 'roomId'>
+}) => (
+  gameState.creatorPlayerId
+    ? getRoomPresence({ roomId: gameState.roomId, playerId: gameState.creatorPlayerId })
+    : undefined
+)
+
 export const getPublicGameState = ({ gameState, playerId }: {
   gameState: GameState
   playerId: string
 }): PublicGameState => {
+  const lobbyCreator = getLobbyCreator({ gameState })
+  const connectedLobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState })
+  const currentPlayerIds = new Set(gameState.players.map(({ id }) => id))
+  const selfIsCreator = playerId === gameState.creatorPlayerId
+  const creatorDisplayName = connectedLobbyCreatorPresence?.name ?? lobbyCreator?.name
   let selfPlayer: Player | undefined
   const publicPlayers: PublicPlayer[] = []
   gameState.players.forEach((player) => {
@@ -52,7 +74,7 @@ export const getPublicGameState = ({ gameState, playerId }: {
     }
   })
 
-  return {
+  const publicGameState: PublicGameState = {
     eventLogs: gameState.eventLogs,
     chatMessages: gameState.chatMessages.map((chatMessage) => ({
       ...chatMessage,
@@ -61,19 +83,49 @@ export const getPublicGameState = ({ gameState, playerId }: {
     settings: gameState.settings,
     lastEventTimestamp: gameState.lastEventTimestamp,
     isStarted: gameState.isStarted,
+    selfIsCreator,
     pendingInfluenceLoss: gameState.pendingInfluenceLoss,
     players: publicPlayers,
     roomId: gameState.roomId,
     deckCount: gameState.deck.length,
     turn: gameState.turn,
-    ...(selfPlayer && { selfPlayer }),
-    ...(gameState.pendingAction && { pendingAction: gameState.pendingAction }),
-    ...(gameState.pendingActionChallenge && { pendingActionChallenge: gameState.pendingActionChallenge }),
-    ...(gameState.pendingBlock && { pendingBlock: gameState.pendingBlock }),
-    ...(gameState.pendingBlockChallenge && { pendingBlockChallenge: gameState.pendingBlockChallenge }),
-    ...(gameState.turnPlayer && { turnPlayer: gameState.turnPlayer }),
-    ...(gameState.resetGameRequest && { resetGameRequest: gameState.resetGameRequest })
   }
+
+  if (connectedLobbyCreatorPresence && lobbyCreator) {
+    publicGameState.creatorPlayerName = lobbyCreator.name
+  }
+  if (creatorDisplayName) {
+    publicGameState.creatorDisplayName = creatorDisplayName
+  }
+  if (selfIsCreator) {
+    publicGameState.spectators = getPublicSpectatorsForRoom({
+      roomId: gameState.roomId,
+      currentPlayerIds
+    })
+  }
+  if (selfPlayer) {
+    publicGameState.selfPlayer = selfPlayer
+  }
+  if (gameState.pendingAction) {
+    publicGameState.pendingAction = gameState.pendingAction
+  }
+  if (gameState.pendingActionChallenge) {
+    publicGameState.pendingActionChallenge = gameState.pendingActionChallenge
+  }
+  if (gameState.pendingBlock) {
+    publicGameState.pendingBlock = gameState.pendingBlock
+  }
+  if (gameState.pendingBlockChallenge) {
+    publicGameState.pendingBlockChallenge = gameState.pendingBlockChallenge
+  }
+  if (gameState.turnPlayer) {
+    publicGameState.turnPlayer = gameState.turnPlayer
+  }
+  if (gameState.resetGameRequest) {
+    publicGameState.resetGameRequest = gameState.resetGameRequest
+  }
+
+  return publicGameState
 }
 
 export const validateGameState = (state: DehydratedGameState) => {

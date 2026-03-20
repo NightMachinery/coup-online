@@ -40,6 +40,13 @@ describe('Waiting Room', () => {
     })
 
     cy.contains('button', 'Reset').click()
+    cy.contains('Only Player One can start the game')
+    cy.contains('button', 'Start Game').should('be.disabled')
+
+    cy.getCookie('cypressRoomId').then((cookie) => {
+      cy.loadPlayer(`/game?roomId=${cookie!.value}`, 'player1')
+    })
+
     cy.contains('button', 'Start Game').click()
   })
 })

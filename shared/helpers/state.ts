@@ -60,6 +60,7 @@ export const dehydrateGameState = (hydrated: GameState): DehydratedGameState => 
   deck: hydrated.deck,
   settings: hydrated.settings,
   availablePlayerColors: hydrated.availablePlayerColors,
+  ...(hydrated.creatorPlayerId !== undefined && { creatorPlayerId: hydrated.creatorPlayerId }),
   players: hydrated.players.map((player) => ({
     ...player,
     claimedInfluences: [...player.claimedInfluences],
@@ -73,11 +74,17 @@ export const dehydratePublicGameState = (hydrated: PublicGameState): DehydratedP
   ...dehydrateCommonGameState(hydrated),
   deckCount: hydrated.deckCount,
   settings: hydrated.settings,
+  selfIsCreator: hydrated.selfIsCreator,
+  ...(hydrated.creatorPlayerName !== undefined && { creatorPlayerName: hydrated.creatorPlayerName }),
+  ...(hydrated.creatorDisplayName !== undefined && { creatorDisplayName: hydrated.creatorDisplayName }),
   players: hydrated.players.map((player) => ({
     ...player,
     claimedInfluences: [...player.claimedInfluences],
     unclaimedInfluences: [...player.unclaimedInfluences]
   })),
+  ...(hydrated.spectators && {
+    spectators: hydrated.spectators
+  }),
   ...(hydrated.selfPlayer && {
     selfPlayer: {
       ...hydrated.selfPlayer,
@@ -137,6 +144,7 @@ export const rehydrateGameState = (dehydrated: DehydratedGameState): GameState =
     deck: dehydrated.deck,
     settings: dehydrated.settings,
     availablePlayerColors: dehydrated.availablePlayerColors,
+    ...(dehydrated.creatorPlayerId !== undefined && { creatorPlayerId: dehydrated.creatorPlayerId }),
     players: dehydrated.players.map((player) => ({
       ...player,
       claimedInfluences: new Set(player.claimedInfluences),
@@ -151,11 +159,17 @@ export const rehydratePublicGameState = (dehydrated: DehydratedPublicGameState):
   ...rehydrateCommonGameState(dehydrated),
   deckCount: dehydrated.deckCount,
   settings: dehydrated.settings,
+  selfIsCreator: dehydrated.selfIsCreator,
+  ...(dehydrated.creatorPlayerName !== undefined && { creatorPlayerName: dehydrated.creatorPlayerName }),
+  ...(dehydrated.creatorDisplayName !== undefined && { creatorDisplayName: dehydrated.creatorDisplayName }),
   players: dehydrated.players.map((player) => ({
     ...player,
     claimedInfluences: new Set(player.claimedInfluences),
     unclaimedInfluences: new Set(player.unclaimedInfluences),
   })),
+  ...(dehydrated.spectators && {
+    spectators: dehydrated.spectators
+  }),
   ...(dehydrated.selfPlayer && {
     selfPlayer: {
       ...dehydrated.selfPlayer,
