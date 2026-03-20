@@ -6,6 +6,7 @@ import { PlayerActions } from '@shared'
 import { getPlayerId } from "../../helpers/players"
 import useGameMutation from "../../hooks/useGameMutation"
 import { useTranslationContext } from "../../contexts/TranslationsContext"
+import { useGameStateContext } from '../../contexts/GameStateContext'
 import { useAuthContext } from '../../contexts/AuthContext'
 import CoupTypography from '../utilities/CoupTypography'
 import { useDisplayName } from '../../hooks/useDisplayName'
@@ -17,6 +18,7 @@ function JoinGame() {
   const { displayName: profileName, loading: profileNameLoading, saveDisplayName } = useDisplayName()
   const navigate = useNavigate()
   const { t } = useTranslationContext()
+  const { gameState, hasInitialStateLoaded } = useGameStateContext()
   const { user, isLocalAuth } = useAuthContext()
   const formRef = useRef<HTMLFormElement>(null)
   const playerNameInputRef = useRef<HTMLInputElement>(null)
@@ -36,6 +38,7 @@ function JoinGame() {
   const visiblePlayerName = isLocalAuth
     ? playerName
     : (profileName ?? playerName)
+  const gameAlreadyStarted = hasInitialStateLoaded && gameState?.roomId === roomId.trim() && gameState.isStarted
 
   useEffect(() => {
     if (isLocalAuth && profileName && !playerName) {
@@ -72,7 +75,7 @@ function JoinGame() {
               })
             }
           } else if (buttonId === 'spectateGameButton') {
-            playerNameInputRef.current!.removeAttribute('required')
+            playerNameInputRef.current!.setAttribute('required', '')
             if (formRef.current!.checkValidity()) {
               const submittedSpectatorName = visiblePlayerName.trim()
               if (!user && submittedSpectatorName) {
@@ -132,18 +135,20 @@ function JoinGame() {
               />
             </Box>
           </Grid>
-          <Grid>
-            <Button
-              id="joinGameButton"
-              type="submit"
-              sx={{ mt: 5 }}
-              variant="contained"
-              loading={joinIsMutating}
-              startIcon={<GroupAdd />}
-            >
-              {t('joinGame')}
-            </Button>
-          </Grid>
+          {!gameAlreadyStarted && (
+            <Grid>
+              <Button
+                id="joinGameButton"
+                type="submit"
+                sx={{ mt: 5 }}
+                variant="contained"
+                loading={joinIsMutating}
+                startIcon={<GroupAdd />}
+              >
+                {t('joinGame')}
+              </Button>
+            </Grid>
+          )}
           <Grid>
             <Button
               id="spectateGameButton"
