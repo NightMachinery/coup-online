@@ -12,6 +12,7 @@ import CardDeck from "../icons/CardDeck"
 import { useTranslationContext } from "../../contexts/TranslationsContext"
 import Forfeit from "./Forfeit"
 import CoupTypography from '../utilities/CoupTypography'
+import EndGamePlayerCards from "./EndGamePlayerCards"
 
 interface GameBoardProps {
   leftDrawerOpen: boolean
@@ -84,6 +85,11 @@ function GameBoard({ leftDrawerOpen, rightDrawerOpen }: Readonly<GameBoardProps>
         <Grid container justifyContent="center" sx={{ my: 2 }}>
           <Players />
         </Grid>
+        {gameIsOver && (
+          <Grid sx={{ my: 4 }}>
+            <EndGamePlayerCards />
+          </Grid>
+        )}
         {!gameIsOver && (
           <Grid container justifyContent="center">
             <Grid sx={{ p: 2 }}>

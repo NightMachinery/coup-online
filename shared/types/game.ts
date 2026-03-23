@@ -209,6 +209,7 @@ export type PublicPlayer = Omit<
   'id' | 'influences' | 'personalityHidden'
 > & {
   influenceCount: number;
+  influences?: Influences[];
 };
 
 export type DehydratedPublicPlayer = Omit<

@@ -182,6 +182,22 @@ describe('gameState', () => {
       ).toStrictEqual(publicGameState)
     })
 
+    it('should expose all player influences when the game is over', () => {
+      const gameState = getRandomGameState({ playersCount: 3 })
+      const selfPlayer = chance.pickone(gameState.players)
+
+      gameState.players[1].deadInfluences.push(...gameState.players[1].influences.splice(0))
+      gameState.players[2].deadInfluences.push(...gameState.players[2].influences.splice(0))
+
+      const publicGameState = getPublicGameState({ gameState, playerId: selfPlayer.id })
+
+      expect(publicGameState.players).toEqual(gameState.players.map((player) => expect.objectContaining({
+        name: player.name,
+        influences: player.influences,
+        deadInfluences: player.deadInfluences,
+      })))
+    })
+
     it('should expose spectators only to the connected creator', () => {
       const gameState = getRandomGameState({ playersCount: 2 })
       const [creator, otherPlayer] = gameState.players

@@ -38,18 +38,21 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
   const humanPlayers = gameState.players.filter(({ ai }) => !ai)
   const creatorCanManageSeats = gameState.isStarted && gameState.selfIsCreator && !inWaitingRoom
   const availableSpectators = gameState.spectators ?? []
+  const gameIsOver = gameState.players.filter(({ influenceCount }) => influenceCount).length === 1
 
   return (
     <Grid container justifyContent="center" spacing={3}>
       {gameState.players
-        .map(({ name, color, coins, influenceCount, deadInfluences, ai, personality }, index) => {
+        .map(({ name, color, coins, influenceCount, deadInfluences, influences: liveInfluences, ai, personality }, index) => {
           const playerColor = gameState.isStarted && !influenceCount ? '#777777' : color
           const cardTextColor = theme.palette.mode === LIGHT_COLOR_MODE ? 'white' : 'black'
           const isWaitingOnPlayer = waitingOnPlayers.some(({ name: waitingOnName }) => waitingOnName === name)
 
           const influences = gameState.isStarted ? [
             ...deadInfluences,
-            ...Array.from({ length: influenceCount }, () => undefined)
+            ...(gameIsOver
+              ? (liveInfluences ?? Array.from({ length: influenceCount }, () => undefined))
+              : Array.from({ length: influenceCount }, () => undefined))
           ] : Array.from({ length: 2 }, () => undefined)
           const selectedSpectatorId = availableSpectators.some(({ id }) => id === selectedSpectatorIds[name])
             ? selectedSpectatorIds[name]

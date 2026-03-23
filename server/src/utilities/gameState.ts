@@ -52,6 +52,7 @@ export const getPublicGameState = ({ gameState, playerId }: {
   const creatorDisplayName = connectedLobbyCreatorPresence?.name ?? lobbyCreator?.name
   let selfPlayer: Player | undefined
   const publicPlayers: PublicPlayer[] = []
+  const gameIsOver = gameState.players.filter(({ influences }) => influences.length > 0).length === 1
   gameState.players.forEach((player) => {
     const pendingInfluenceCountToPutBack = gameState.pendingInfluenceLoss[player.name]
       ?.filter(({ putBackInDeck }) => putBackInDeck)?.length ?? 0
@@ -67,7 +68,8 @@ export const getPublicGameState = ({ gameState, playerId }: {
       grudges: player.grudges,
       ...(player.uid && { uid: player.uid }),
       ...(player.photoURL && { photoURL: player.photoURL }),
-      ...(!player.personalityHidden && player.personality && { personality: player.personality })
+      ...(!player.personalityHidden && player.personality && { personality: player.personality }),
+      ...(gameIsOver && { influences: player.influences })
     })
     if (player.id === playerId) {
       selfPlayer = player
