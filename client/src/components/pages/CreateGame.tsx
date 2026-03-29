@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { type ReactNode, useCallback, useEffect, useState } from 'react'
 import {
   Box,
   Button,
@@ -30,6 +30,8 @@ import { useDisplayName } from '../../hooks/useDisplayName'
 
 function CreateGame() {
   const [playerName, setPlayerName] = useState('')
+  const [nameSaveError, setNameSaveError] = useState<ReactNode>(null)
+  const [nameSaving, setNameSaving] = useState(false)
   const { displayName: profileName, loading: profileNameLoading, saveDisplayName } = useDisplayName()
   const [eventLogRetentionTurns, setEventLogRetentionTurns] = usePersistedState<number>(eventLogRetentionTurnsStorageKey, 3)
   const [allowRevive, setAllowRevive] = usePersistedState<boolean>(allowReviveStorageKey, false)
@@ -58,6 +60,13 @@ function CreateGame() {
     ? playerName
     : (profileName ?? playerName)
 
+  const getNameSaveErrorMessage = useCallback((error?: string) => {
+    const knownErrors = ['inappropriateDisplayName', 'displayNameTaken'] as const
+    return knownErrors.includes(error as typeof knownErrors[number])
+      ? t(error as typeof knownErrors[number])
+      : t('somethingWentWrong')
+  }, [t])
+
   useEffect(() => {
     if (isLocalAuth && profileName && !playerName) {
       setPlayerName(profileName)
@@ -73,9 +82,20 @@ function CreateGame() {
         onSubmit={async (event) => {
           event.preventDefault()
           const submittedPlayerName = visiblePlayerName.trim()
-          if (isLocalAuth || !user) {
+          setNameSaveError(null)
+
+          if (user && !isLocalAuth && !profileName) {
+            setNameSaving(true)
+            const result = await saveDisplayName(submittedPlayerName)
+            setNameSaving(false)
+            if (!result.success) {
+              setNameSaveError(getNameSaveErrorMessage(result.error))
+              return
+            }
+          } else if (isLocalAuth || !user) {
             await saveDisplayName(submittedPlayerName)
           }
+
           trigger({
             playerId: getPlayerId(),
             playerName: submittedPlayerName,
@@ -99,6 +119,7 @@ function CreateGame() {
                 data-testid="playerNameInput"
                 value={visiblePlayerName}
                 onChange={(event) => {
+                  setNameSaveError(null)
                   if (isLocalAuth || !profileName) {
                     setPlayerName(event.target.value.slice(0, 10))
                   }
@@ -107,7 +128,8 @@ function CreateGame() {
                 variant="standard"
                 required={!visiblePlayerName}
                 disabled={profileNameLoading}
-                helperText={!isLocalAuth && profileName ? t('nameFromProfile') : undefined}
+                error={!!nameSaveError}
+                helperText={nameSaveError ?? (!isLocalAuth && profileName ? t('nameFromProfile') : undefined)}
               />
             </Box>
           </Grid>
@@ -185,7 +207,7 @@ function CreateGame() {
             type="submit"
             sx={{ mt: 5 }}
             variant="contained"
-            loading={isMutating}
+            loading={isMutating || nameSaving}
             startIcon={<AddCircle />}
           >
             {t('createGame')}

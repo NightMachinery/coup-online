@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef } from "react"
+import { type ReactNode, useCallback, useEffect, useState, useRef } from "react"
 import { Box, Button, Grid, TextField } from "@mui/material"
 import { Person, Group, GroupAdd, Visibility } from "@mui/icons-material"
 import { useNavigate, useSearchParams } from "react-router"
@@ -15,6 +15,8 @@ function JoinGame() {
   const [searchParams] = useSearchParams()
   const [roomId, setRoomId] = useState(searchParams.get('roomId') ?? '')
   const [playerName, setPlayerName] = useState('')
+  const [nameSaveError, setNameSaveError] = useState<ReactNode>(null)
+  const [nameSaving, setNameSaving] = useState(false)
   const { displayName: profileName, loading: profileNameLoading, saveDisplayName } = useDisplayName()
   const navigate = useNavigate()
   const { t } = useTranslationContext()
@@ -40,6 +42,31 @@ function JoinGame() {
     : (profileName ?? playerName)
   const gameAlreadyStarted = hasInitialStateLoaded && gameState?.roomId === roomId.trim() && gameState.isStarted
 
+  const getNameSaveErrorMessage = useCallback((error?: string) => {
+    const knownErrors = ['inappropriateDisplayName', 'displayNameTaken'] as const
+    return knownErrors.includes(error as typeof knownErrors[number])
+      ? t(error as typeof knownErrors[number])
+      : t('somethingWentWrong')
+  }, [t])
+
+  const ensureDisplayNameSaved = useCallback(async (submittedName: string) => {
+    setNameSaveError(null)
+
+    if (user && !isLocalAuth && !profileName) {
+      setNameSaving(true)
+      const result = await saveDisplayName(submittedName)
+      setNameSaving(false)
+      if (!result.success) {
+        setNameSaveError(getNameSaveErrorMessage(result.error))
+        return false
+      }
+    } else if (isLocalAuth || !user) {
+      await saveDisplayName(submittedName)
+    }
+
+    return true
+  }, [getNameSaveErrorMessage, isLocalAuth, profileName, saveDisplayName, user])
+
   useEffect(() => {
     if (isLocalAuth && profileName && !playerName) {
       setPlayerName(profileName)
@@ -63,31 +90,29 @@ function JoinGame() {
             playerNameInputRef.current!.setAttribute('required', '')
             if (formRef.current!.checkValidity()) {
               const submittedPlayerName = visiblePlayerName.trim()
-              if (isLocalAuth || !user) {
-                await saveDisplayName(submittedPlayerName)
+              if (await ensureDisplayNameSaved(submittedPlayerName)) {
+                joinTrigger({
+                  roomId: roomId.trim(),
+                  playerId: getPlayerId(),
+                  playerName: submittedPlayerName,
+                  ...(user && { uid: user.uid }),
+                  ...(user?.photoURL && { photoURL: user.photoURL }),
+                })
               }
-              joinTrigger({
-                roomId: roomId.trim(),
-                playerId: getPlayerId(),
-                playerName: submittedPlayerName,
-                ...(user && { uid: user.uid }),
-                ...(user?.photoURL && { photoURL: user.photoURL }),
-              })
             }
           } else if (buttonId === 'spectateGameButton') {
             playerNameInputRef.current!.setAttribute('required', '')
             if (formRef.current!.checkValidity()) {
               const submittedSpectatorName = visiblePlayerName.trim()
-              if (!user && submittedSpectatorName) {
-                await saveDisplayName(submittedSpectatorName)
+              if (await ensureDisplayNameSaved(submittedSpectatorName)) {
+                spectateTrigger({
+                  roomId: roomId.trim(),
+                  playerId: getPlayerId(),
+                  ...(submittedSpectatorName && { spectatorName: submittedSpectatorName }),
+                  ...(user && { uid: user.uid }),
+                  ...(user?.photoURL && { photoURL: user.photoURL }),
+                })
               }
-              spectateTrigger({
-                roomId: roomId.trim(),
-                playerId: getPlayerId(),
-                ...(submittedSpectatorName && { spectatorName: submittedSpectatorName }),
-                ...(user && { uid: user.uid }),
-                ...(user?.photoURL && { photoURL: user.photoURL }),
-              })
             }
           } else {
             console.error('Unexpected button ID:', buttonId)
@@ -123,6 +148,7 @@ function JoinGame() {
                 data-testid='playerNameInput'
                 value={visiblePlayerName}
                 onChange={(event) => {
+                  setNameSaveError(null)
                   if (isLocalAuth || !profileName) {
                     setPlayerName(event.target.value.slice(0, 10))
                   }
@@ -131,7 +157,8 @@ function JoinGame() {
                 variant="standard"
                 required={!visiblePlayerName}
                 disabled={profileNameLoading}
-                helperText={!isLocalAuth && profileName ? t('nameFromProfile') : undefined}
+                error={!!nameSaveError}
+                helperText={nameSaveError ?? (!isLocalAuth && profileName ? t('nameFromProfile') : undefined)}
               />
             </Box>
           </Grid>
@@ -142,7 +169,7 @@ function JoinGame() {
                 type="submit"
                 sx={{ mt: 5 }}
                 variant="contained"
-                loading={joinIsMutating}
+                loading={joinIsMutating || nameSaving}
                 startIcon={<GroupAdd />}
               >
                 {t('joinGame')}
@@ -154,7 +181,7 @@ function JoinGame() {
               id="spectateGameButton"
               type="submit"
               variant="contained"
-              loading={spectateIsMutating}
+              loading={spectateIsMutating || nameSaving}
               startIcon={<Visibility />}
             >
               {t('spectateGame')}

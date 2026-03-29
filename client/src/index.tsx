@@ -9,6 +9,7 @@ import { TranslationContextProvider } from './contexts/TranslationsContext'
 import { UserSettingsContextProvider } from './contexts/UserSettingsContext'
 import { NotificationsContextProvider } from './contexts/NotificationsContext'
 import { AuthContextProvider } from './contexts/AuthContext'
+import { DisplayNameContextProvider } from './contexts/DisplayNameContext'
 
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement
@@ -18,13 +19,15 @@ root.render(
     <BrowserRouter>
       <MaterialThemeContextProvider>
         <AuthContextProvider>
-          <TranslationContextProvider>
-            <NotificationsContextProvider>
-              <UserSettingsContextProvider>
-                <App />
-              </UserSettingsContextProvider>
-            </NotificationsContextProvider>
-          </TranslationContextProvider>
+          <DisplayNameContextProvider>
+            <TranslationContextProvider>
+              <NotificationsContextProvider>
+                <UserSettingsContextProvider>
+                  <App />
+                </UserSettingsContextProvider>
+              </NotificationsContextProvider>
+            </TranslationContextProvider>
+          </DisplayNameContextProvider>
         </AuthContextProvider>
       </MaterialThemeContextProvider>
     </BrowserRouter>
