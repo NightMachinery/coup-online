@@ -15,6 +15,7 @@ import { useNavigate } from "react-router"
 import { useNotificationsContext } from "../../contexts/NotificationsContext"
 import CoupTypography from '../utilities/CoupTypography'
 import { copyTextToClipboard } from '../../helpers/clipboard'
+import InfluenceDeckSummary from "./InfluenceDeckSummary"
 
 function WaitingRoom() {
   const [addAiPlayerDialogOpen, setAddAiPlayerDialogOpen] = useState(false)
@@ -49,6 +50,9 @@ function WaitingRoom() {
         {t('room')}
         : <strong>{gameState.roomId}</strong>
       </CoupTypography>
+      <Box mb={3}>
+        <InfluenceDeckSummary />
+      </Box>
       <Grid container direction='column' spacing={2}>
         <Grid>
           <QRCodeSVG

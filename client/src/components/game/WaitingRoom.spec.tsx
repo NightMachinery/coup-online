@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import WaitingRoom from './WaitingRoom'
+import { MaterialThemeContextProvider } from '../../contexts/MaterialThemeContext'
 
 const mockGameState = {
   roomId: 'ROOM1',
@@ -14,7 +15,7 @@ const mockGameState = {
   settings: {
     allowRevive: true,
     allowContessaBlockExamine: true,
-    enableInquisitor: true,
+    enableInquisitor: false,
     enableReformation: true,
     eventLogRetentionTurns: 3,
     speedRoundSeconds: 15,
@@ -38,7 +39,15 @@ vi.mock('../../contexts/GameStateContext', () => ({
 }))
 
 vi.mock('../../contexts/TranslationsContext', () => ({
-  useTranslationContext: () => ({ t: (key: string) => key }),
+  useTranslationContext: () => ({
+    t: (key: string, variables?: { count?: number }) => {
+      if (key === 'countOfEachCardType') {
+        return `${variables?.count} of each card type`
+      }
+
+      return key
+    }
+  }),
 }))
 
 vi.mock('../../contexts/NotificationsContext', () => ({
@@ -62,8 +71,28 @@ vi.mock('../../helpers/players', () => ({
 }))
 
 describe('WaitingRoom', () => {
+  it('shows standard room influence counts', () => {
+    mockGameState.settings.enableInquisitor = false
+
+    render(
+      <MaterialThemeContextProvider>
+        <WaitingRoom />
+      </MaterialThemeContextProvider>
+    )
+
+    expect(screen.getByText('3 of each card type')).toBeInTheDocument()
+    expect(screen.getByText('Ambassador ×3')).toBeInTheDocument()
+    expect(screen.queryByText('Inquisitor ×3')).not.toBeInTheDocument()
+  })
+
   it('shows explanatory summaries for enabled rules variants', () => {
-    render(<WaitingRoom />)
+    mockGameState.settings.enableInquisitor = true
+
+    render(
+      <MaterialThemeContextProvider>
+        <WaitingRoom />
+      </MaterialThemeContextProvider>
+    )
 
     expect(screen.getByText('reviveSummary')).toBeInTheDocument()
     expect(screen.getByText('reformationSummary')).toBeInTheDocument()

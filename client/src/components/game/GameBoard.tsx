@@ -13,6 +13,7 @@ import { useTranslationContext } from "../../contexts/TranslationsContext"
 import Forfeit from "./Forfeit"
 import CoupTypography from '../utilities/CoupTypography'
 import EndGamePlayerCards from "./EndGamePlayerCards"
+import InfluenceDeckSummary from "./InfluenceDeckSummary"
 
 interface GameBoardProps {
   leftDrawerOpen: boolean
@@ -110,6 +111,17 @@ function GameBoard({ leftDrawerOpen, rightDrawerOpen }: Readonly<GameBoardProps>
         >
           <Grid size={12}>
             <EventLog />
+          </Grid>
+          <Grid size={12}>
+            <InfluenceDeckSummary
+              containerSx={centeredOnSmallScreen}
+              listSx={{
+                justifyContent: 'center',
+                [theme.breakpoints.up('md')]: {
+                  justifyContent: 'flex-end'
+                }
+              }}
+            />
           </Grid>
           <Grid
             container

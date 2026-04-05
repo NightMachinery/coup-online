@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { Influences } from '../../../shared/types/game'
+import { getDeckInfluences } from '../../../shared/helpers/deck'
 import { getCountOfEachInfluence, createDeckForPlayerCount } from './deck'
 
 describe('getCountOfEachInfluence', () => {
@@ -75,4 +76,26 @@ describe('createDeckForPlayerCount', () => {
       })
     },
   )
+})
+
+describe('getDeckInfluences', () => {
+  it('should return standard deck influences without inquisitor', () => {
+    expect(getDeckInfluences({ enableInquisitor: false })).toEqual([
+      Influences.Assassin,
+      Influences.Contessa,
+      Influences.Captain,
+      Influences.Ambassador,
+      Influences.Duke,
+    ])
+  })
+
+  it('should return inquisitor deck influences without ambassador', () => {
+    expect(getDeckInfluences({ enableInquisitor: true })).toEqual([
+      Influences.Assassin,
+      Influences.Contessa,
+      Influences.Captain,
+      Influences.Inquisitor,
+      Influences.Duke,
+    ])
+  })
 })

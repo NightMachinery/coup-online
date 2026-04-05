@@ -66,6 +66,7 @@ export type Translations = ActionMessages &
     confirmActions: TranslationsForString
     contessaBlockExamineSummary: TranslationsForString
     contents: TranslationsForString
+    countOfEachCardType: TranslationsForString
     copyInviteLink: TranslationsForString
     createGame: TranslationsForString
     createNewGame: TranslationsForString
@@ -530,6 +531,7 @@ const translations: Translations = {
     'it-IT': '{{count}} carta{{plural[[e]]}} nel mazzo',
     'pt-BR': '{{count}} carta{{plural[[s]]}} no baralho',
   },
+  countOfEachCardType: untranslated('{{count}} of each card type'),
   challenge: {
     'de-DE': 'Herausfordern',
     'en-US': 'Challenge',
