@@ -1,5 +1,5 @@
 import { MAX_PLAYER_COUNT } from "../../../shared/helpers/playerCount"
-import { Influences } from "../../../shared/types/game"
+import { GameSettings, Influences } from "../../../shared/types/game"
 import { shuffle } from "./array"
 
 export const getCountOfEachInfluence = (playerCount: number): number => {
@@ -18,7 +18,14 @@ export const getCountOfEachInfluence = (playerCount: number): number => {
   throw new Error(`Invalid player count: ${playerCount}`)
 }
 
-export const createDeckForPlayerCount = (playerCount: number): Influences[] => {
+export const createDeckForPlayerCount = (playerCount: number, settings?: Pick<GameSettings, 'enableInquisitor'>): Influences[] => {
   const count = getCountOfEachInfluence(playerCount)
-  return shuffle(Object.values(Influences).flatMap((influence) => Array.from({ length: count }, () => influence)))
+  const deckInfluences = Object.values(Influences).filter((influence) => {
+    if (settings?.enableInquisitor) {
+      return influence !== Influences.Ambassador
+    }
+
+    return influence !== Influences.Inquisitor
+  })
+  return shuffle(deckInfluences.flatMap((influence) => Array.from({ length: count }, () => influence)))
 }

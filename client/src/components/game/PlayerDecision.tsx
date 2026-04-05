@@ -1,5 +1,5 @@
 import { Box } from '@mui/material'
-import { canPlayerChooseAction, canPlayerChooseActionChallengeResponse, canPlayerChooseActionResponse, canPlayerChooseBlockChallengeResponse, canPlayerChooseBlockResponse } from '@shared'
+import { canPlayerChooseAction, canPlayerChooseActionChallengeResponse, canPlayerChooseActionResponse, canPlayerChooseBlockChallengeResponse, canPlayerChooseBlockResponse, canPlayerChooseEmbezzleChallengeDecision, canPlayerChooseExamineInfluence, canPlayerChooseStartingAllegiance, canPlayerResolveExamine } from '@shared'
 import ChooseAction from "./ChooseAction"
 import ChooseActionResponse from "./ChooseActionResponse"
 import ChooseChallengeResponse from "./ChooseChallengeResponse"
@@ -9,6 +9,10 @@ import { useGameStateContext } from "../../contexts/GameStateContext"
 import ChooseInfluencesToKeep from "./ChooseInfluencesToKeep"
 import WaitingOnOtherPlayers from "./WaitingOnOtherPlayers"
 import SpeedRoundTimer from './SpeedRoundTimer'
+import ChooseStartingAllegiance from './ChooseStartingAllegiance'
+import ChooseExamineInfluence from './ChooseExamineInfluence'
+import ResolveExamine from './ResolveExamine'
+import ChooseEmbezzleChallengeDecision from './ChooseEmbezzleChallengeDecision'
 
 function PlayerDecision() {
   const { gameState } = useGameStateContext()
@@ -22,6 +26,14 @@ function PlayerDecision() {
   const pendingInfluenceLoss = gameState.pendingInfluenceLoss[gameState.selfPlayer.name]
   if (pendingInfluenceLoss) {
     decision = pendingInfluenceLoss[0].putBackInDeck ? <ChooseInfluencesToKeep /> : <ChooseInfluenceToLose />
+  } else if (canPlayerChooseStartingAllegiance(gameState)) {
+    decision = <ChooseStartingAllegiance />
+  } else if (canPlayerChooseExamineInfluence(gameState)) {
+    decision = <ChooseExamineInfluence />
+  } else if (canPlayerResolveExamine(gameState)) {
+    decision = <ResolveExamine />
+  } else if (canPlayerChooseEmbezzleChallengeDecision(gameState)) {
+    decision = <ChooseEmbezzleChallengeDecision />
   } else if (canPlayerChooseAction(gameState)) {
     decision = <ChooseAction />
   } else if (canPlayerChooseActionResponse(gameState)) {

@@ -43,7 +43,7 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
   return (
     <Grid container justifyContent="center" spacing={3}>
       {gameState.players
-        .map(({ name, color, coins, influenceCount, deadInfluences, influences: liveInfluences, ai, personality }, index) => {
+        .map(({ name, color, coins, influenceCount, deadInfluences, influences: liveInfluences, ai, personality, allegiance }, index) => {
           const playerColor = gameState.isStarted && !influenceCount ? '#777777' : color
           const cardTextColor = theme.palette.mode === LIGHT_COLOR_MODE ? 'white' : 'black'
           const isWaitingOnPlayer = waitingOnPlayers.some(({ name: waitingOnName }) => waitingOnName === name)
@@ -110,6 +110,11 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
                 >
                   <OverflowTooltip>{name}</OverflowTooltip>
                 </Typography>
+                {gameState.settings.enableReformation && allegiance && (
+                  <Typography variant="caption" sx={{ color: cardTextColor, display: 'block' }}>
+                    {t(allegiance as never)}
+                  </Typography>
+                )}
                 <Typography variant="h6" sx={{ color: cardTextColor }}>
                   {ai && (
                     <Tooltip title={

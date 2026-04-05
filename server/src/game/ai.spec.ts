@@ -62,6 +62,7 @@ describe('ai', () => {
       lastEventTimestamp: chance.date(),
       isStarted: chance.bool(),
       selfIsCreator: false,
+      treasuryReserveCoins: 0,
       turn: chance.natural(),
       players: [],
       pendingInfluenceLoss: {},
@@ -369,6 +370,7 @@ describe('ai', () => {
           settings: { eventLogRetentionTurns: 3, allowRevive: false },
           pendingInfluenceLoss: {},
           selfIsCreator: false,
+          treasuryReserveCoins: 0,
           deckCount: 11,
         }),
       ).toEqual({
@@ -411,6 +413,7 @@ describe('ai', () => {
           settings: { eventLogRetentionTurns: 3, allowRevive: true },
           pendingInfluenceLoss: {},
           selfIsCreator: false,
+          treasuryReserveCoins: 0,
           deckCount: 11,
         }),
       ).toEqual({
@@ -462,6 +465,7 @@ describe('ai', () => {
         settings: { eventLogRetentionTurns: 3, allowRevive: false },
         pendingInfluenceLoss: {},
         selfIsCreator: false,
+        treasuryReserveCoins: 0,
         deckCount: 11,
       })
 
@@ -511,6 +515,7 @@ describe('ai', () => {
         settings: { eventLogRetentionTurns: 3, allowRevive: true },
         pendingInfluenceLoss: {},
         selfIsCreator: false,
+        treasuryReserveCoins: 0,
         deckCount: 11,
       })
 
@@ -566,6 +571,7 @@ describe('ai', () => {
           settings: { eventLogRetentionTurns: 3, allowRevive: true },
           pendingInfluenceLoss: {},
           selfIsCreator: false,
+          treasuryReserveCoins: 0,
           deckCount: 11,
         }),
       ).toEqual({ response: Responses.Challenge })

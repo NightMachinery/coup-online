@@ -1,17 +1,79 @@
 import crypto from 'node:crypto'
 import { ActionNotChallengeableError, ActionNotCurrentlyAllowedError, BlockMayNotBeBlockedError, ClaimedInfluenceAlreadyConfirmedError, ClaimedInfluenceInvalidError, ClaimedInfluenceRequiredError, ConnectedSpectatorRequiredError, DifferentPlayerNameError, GameInProgressError, GameNeedsAtLeast2PlayersToStartError, GameNotInProgressError, GameOverError, InsufficientCoinsError, InvalidActionAt10CoinsError, MessageDoesNotExistError, MessageIsNotYoursError, MissingInfluenceError, NoDeadInfluencesError, OnlyLobbyCreatorCanSetPlayerControllerError, OnlyLobbyCreatorCanStartGameError, PlayerAlreadyBotControlledError, PlayerAlreadyHumanControlledError, PlayerNotInGameError, ReviveNotAllowedInGameError, RoomAlreadyHasPlayerError, RoomIdAlreadyExistsError, RoomIsFullError, SpeedRoundTimerExpiredError, StateChangedSinceValidationError, TargetPlayerIsSelfError, TargetPlayerNotAllowedForActionError, TargetPlayerRequiredForActionError, UnableToFindPlayerError, UnableToForfeitError, YouAreDeadError } from "../utilities/errors"
-import { ActionAttributes, Actions, AiPersonality, EventMessages, GameSettings, GameState, InfluenceAttributes, Influences, PlayerActions, PlayerControllers, Responses } from "../../../shared/types/game"
+import { ActionAttributes, Actions, AiPersonality, Allegiances, EmbezzleChallengeResponses, EventMessages, ExamineResponses, GameSettings, GameState, Influences, PlayerActions, PlayerControllers, Responses } from "../../../shared/types/game"
 import { getConnectedLobbyCreatorPresence, getGameState, getPublicGameState, logEvent, logForcedMove, mutateGameState } from "../utilities/gameState"
 import { generateRoomId } from "../utilities/identifiers"
 import { getValue } from '../utilities/storage'
 import { shuffle } from '../utilities/array'
-import { addClaimedInfluence, addPlayerToGame, addUnclaimedInfluence, createNewGame, grudgeSizes, holdGrudge, humanOpponentsRemain, isSpeedRoundTimerExpired, killPlayerInfluence, moveTurnToNextPlayer, processPendingAction, promptPlayerToLoseInfluence, removeClaimedInfluence, removePlayerFromGame, resetGame, revealAndReplaceInfluence, startGame } from "./logic"
-import { canPlayerChooseAction, canPlayerChooseActionChallengeResponse, canPlayerChooseActionResponse, canPlayerChooseBlockChallengeResponse, canPlayerChooseBlockResponse } from '../../../shared/game/logic'
+import { addClaimedInfluence, addPlayerToGame, addUnclaimedInfluence, assignAllegiances, createNewGame, getLivingPlayers, grudgeSizes, holdGrudge, humanOpponentsRemain, isSpeedRoundTimerExpired, killPlayerInfluence, moveTurnToNextPlayer, processPendingAction, promptPlayerToLoseInfluence, removeClaimedInfluence, removePlayerFromGame, resetGame, revealAndReplaceInfluence, startGame } from "./logic"
+import { canPlayerBlockAction, canPlayerChooseAction, canPlayerChooseActionChallengeResponse, canPlayerChooseActionResponse, canPlayerChooseBlockChallengeResponse, canPlayerChooseBlockResponse, canPlayerChooseEmbezzleChallengeDecision, canPlayerChooseExamineInfluence, canPlayerResolveExamine as canPlayerResolveExamine, canPlayerChooseStartingAllegiance, canTargetPlayerForAction, getLegalBlockInfluences, getRequiredInfluenceForAction } from '../../../shared/game/logic'
 import { getPlayerSuggestedMove } from './ai'
 import { MAX_PLAYER_COUNT } from '../../../shared/helpers/playerCount'
 import { AvailableLanguageCode } from '../../../shared/i18n/availableLanguages'
 import { recordBluff, recordChallengeMade, recordCoup, recordInfluenceKill, recordInfluenceClaim, recordSuccessfulBluff, recordSuccessfulChallenge } from './statsAccumulator'
 import { getViewerIdForSpectator, removeRoomPresence, upsertRoomPresence } from '../utilities/roomPresence'
+
+
+const getNormalizedSettings = (settings: GameSettings): GameSettings => ({
+  ...settings,
+  enableReformation: settings.enableReformation ?? false,
+  enableInquisitor: settings.enableInquisitor ?? false,
+  allowContessaBlockExamine: settings.allowContessaBlockExamine ?? false,
+})
+
+const getCoinsRequiredForAction = ({
+  action,
+  playerName,
+  targetPlayer,
+}: {
+  action: Actions
+  playerName: string
+  targetPlayer: string | undefined
+}) => {
+  if (action === Actions.Convert) {
+    return !targetPlayer || targetPlayer === playerName ? 1 : 2
+  }
+
+  return ActionAttributes[action].coinsRequired ?? 0
+}
+
+const replaceAllLiveInfluences = (state: GameState, playerName: string) => {
+  const player = state.players.find(({ name }) => name === playerName)
+  if (!player) {
+    throw new UnableToFindPlayerError()
+  }
+
+  const liveInfluences = [...player.influences]
+  removeClaimedInfluence(player)
+  liveInfluences.forEach((influence, index) => {
+    player.influences[index] = drawReplacementInfluenceBeforeReturning(state, influence)
+  })
+}
+
+const drawReplacementInfluenceBeforeReturning = (state: GameState, returnedInfluence: Influences) => {
+  const replacement = state.deck.pop()
+  if (!replacement) {
+    throw new UnableToFindPlayerError()
+  }
+  state.deck.push(returnedInfluence)
+  state.deck = shuffle(state.deck)
+  return replacement
+}
+
+const forceExchangeExaminedInfluence = (state: GameState, playerName: string, influence: Influences) => {
+  const player = state.players.find(({ name }) => name === playerName)
+  if (!player) {
+    throw new UnableToFindPlayerError()
+  }
+
+  const influenceIndex = player.influences.indexOf(influence)
+  if (influenceIndex < 0) {
+    throw new MissingInfluenceError()
+  }
+
+  player.influences.splice(influenceIndex, 1)
+  player.influences.push(drawReplacementInfluenceBeforeReturning(state, influence))
+}
 
 const getPlayerInRoom = ({ gameState, playerId }: {
   gameState: GameState
@@ -125,7 +187,7 @@ export const createGameHandler = async ({ playerId, playerName, settings, uid, p
     throw new RoomIdAlreadyExistsError(roomId)
   }
 
-  await createNewGame(roomId, playerId, playerName, settings, uid, photoURL)
+  await createNewGame(roomId, playerId, playerName, getNormalizedSettings(settings), uid, photoURL)
   upsertRoomPresence({
     roomId,
     playerId,
@@ -414,23 +476,25 @@ export const startGameHandler = async ({ roomId, playerId }: {
   const gameState = await getGameState(roomId)
   const player = gameState.players.find(({ id }) => id === playerId)
 
-  if (gameState.players.length < 2) {
-    throw new GameNeedsAtLeast2PlayersToStartError()
-  }
-
   if (gameState.isStarted) {
     throw new GameInProgressError()
+  }
+
+  if (gameState.players.length < 2 && gameState.creatorPlayerId !== playerId) {
+    throw new PlayerNotInGameError()
+  }
+
+  if (!player) {
+    throw new PlayerNotInGameError()
   }
 
   const lobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState })
   if (lobbyCreatorPresence && gameState.creatorPlayerId !== playerId) {
     throw new OnlyLobbyCreatorCanStartGameError()
   }
-  if (!lobbyCreatorPresence && gameState.creatorPlayerId && !player) {
-    throw new PlayerNotInGameError()
-  }
-  if (!gameState.creatorPlayerId && !player) {
-    throw new PlayerNotInGameError()
+
+  if (gameState.players.length < 2) {
+    throw new GameNeedsAtLeast2PlayersToStartError()
   }
 
   await mutateGameState(gameState, startGame)
@@ -571,6 +635,14 @@ export const checkAutoMoveHandler = async ({ roomId, playerId }: {
 
     if (move === PlayerActions.loseInfluences) {
       await loseInfluencesHandler({ ...(params as Parameters<typeof loseInfluencesHandler>[0]), isForcedMove })
+    } else if (move === PlayerActions.chooseStartingAllegiance) {
+      await chooseStartingAllegianceHandler(params as Parameters<typeof chooseStartingAllegianceHandler>[0])
+    } else if (move === PlayerActions.chooseExamineInfluence) {
+      await chooseExamineInfluenceHandler({ ...(params as Parameters<typeof chooseExamineInfluenceHandler>[0]), isForcedMove })
+    } else if (move === PlayerActions.resolveExamine) {
+      await resolveExamineHandler({ ...(params as Parameters<typeof resolveExamineHandler>[0]), isForcedMove })
+    } else if (move === PlayerActions.embezzleChallengeDecision) {
+      await embezzleChallengeDecisionHandler({ ...(params as Parameters<typeof embezzleChallengeDecisionHandler>[0]), isForcedMove })
     } else if (move === PlayerActions.action) {
       await actionHandler({ ...(params as Parameters<typeof actionHandler>[0]), isForcedMove })
     } else if (move === PlayerActions.actionResponse) {
@@ -609,12 +681,18 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
   enforceSpeedRoundTimer(gameState, isForcedMove)
 
   const player = getPlayerInRoom({ gameState, playerId })
+  const normalizedSettings = getNormalizedSettings(gameState.settings)
+  const coinsRequired = getCoinsRequiredForAction({
+    action,
+    playerName: player.name,
+    targetPlayer,
+  })
 
   if (!player.influences.length) {
     throw new YouAreDeadError()
   }
 
-  if ((ActionAttributes[action].coinsRequired ?? 0) > player.coins) {
+  if (coinsRequired > player.coins) {
     throw new InsufficientCoinsError()
   }
 
@@ -623,7 +701,7 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
   }
 
   if (action === Actions.Revive) {
-    if (!gameState.settings.allowRevive) {
+    if (!normalizedSettings.allowRevive) {
       throw new ReviveNotAllowedInGameError()
     }
     if (!player.deadInfluences.length) {
@@ -631,20 +709,29 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
     }
   }
 
-  if (targetPlayer && !gameState.players.some((player) => player.name === targetPlayer)) {
+  if (![Actions.Convert].includes(action) && targetPlayer && !gameState.players.some((player) => player.name === targetPlayer)) {
     throw new UnableToFindPlayerError()
   }
 
-  if (ActionAttributes[action].requiresTarget && !targetPlayer) {
+  if (ActionAttributes[action].targetMode === 'required' && !targetPlayer) {
     throw new TargetPlayerRequiredForActionError()
   }
 
-  if (!ActionAttributes[action].requiresTarget && targetPlayer) {
+  if (ActionAttributes[action].targetMode === 'none' && targetPlayer) {
     throw new TargetPlayerNotAllowedForActionError()
   }
 
-  if (targetPlayer === player.name) {
+  if (targetPlayer === player.name && action !== Actions.Convert) {
     throw new TargetPlayerIsSelfError()
+  }
+
+  if (targetPlayer && action !== Actions.Convert && !canTargetPlayerForAction({
+    gameState: getPublicGameState({ gameState, playerId }),
+    action,
+    sourcePlayerName: player.name,
+    targetPlayerName: targetPlayer,
+  })) {
+    throw new TargetPlayerNotAllowedForActionError()
   }
 
   if (!ActionAttributes[action].blockable && !ActionAttributes[action].challengeable) {
@@ -668,6 +755,15 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
 
         if (!canPlayerChooseAction(getPublicGameState({ gameState: state, playerId: coupingPlayer.id }))) {
           throw new ActionNotCurrentlyAllowedError()
+        }
+
+        if (!canTargetPlayerForAction({
+          gameState: getPublicGameState({ gameState: state, playerId: coupingPlayer.id }),
+          action,
+          sourcePlayerName: coupingPlayer.name,
+          targetPlayerName: targetPlayer,
+        })) {
+          throw new TargetPlayerNotAllowedForActionError()
         }
 
         coupingPlayer.coins -= ActionAttributes.Coup.coinsRequired!
@@ -740,6 +836,47 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
           primaryPlayer: player.name
         })
       })
+    } else if (action === Actions.Convert) {
+      await mutateGameState(gameState, (state) => {
+        if (isForcedMove) logForcedMove(state, player)
+
+        const convertingPlayer = state.players.find(({ id }) => id === playerId)
+        if (!convertingPlayer) {
+          throw new UnableToFindPlayerError()
+        }
+        if (!canPlayerChooseAction(getPublicGameState({ gameState: state, playerId: convertingPlayer.id }))) {
+          throw new ActionNotCurrentlyAllowedError()
+        }
+
+        const convertedPlayer = !targetPlayer || targetPlayer === convertingPlayer.name
+          ? convertingPlayer
+          : state.players.find(({ name }) => name === targetPlayer)
+        if (!convertedPlayer) {
+          throw new UnableToFindPlayerError()
+        }
+
+        const actionCost = getCoinsRequiredForAction({
+          action,
+          playerName: convertingPlayer.name,
+          targetPlayer,
+        })
+        if (convertingPlayer.coins < actionCost) {
+          throw new InsufficientCoinsError()
+        }
+
+        convertingPlayer.coins -= actionCost
+        state.treasuryReserveCoins += actionCost
+        convertedPlayer.allegiance = convertedPlayer.allegiance
+          ? (convertedPlayer.allegiance === Allegiances.Loyalist ? Allegiances.Reformist : Allegiances.Loyalist)
+          : Allegiances.Loyalist
+        moveTurnToNextPlayer(state)
+        logEvent(state, {
+          event: EventMessages.ActionProcessed,
+          action,
+          primaryPlayer: player.name,
+          ...(convertedPlayer.name !== player.name && { secondaryPlayer: convertedPlayer.name })
+        })
+      })
     }
   } else {
     await mutateGameState(gameState, (state) => {
@@ -761,8 +898,7 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
         claimConfirmed: false
       }
 
-      // Track influence claim and bluff stats
-      const requiredInfluence = ActionAttributes[action].influenceRequired
+      const requiredInfluence = getRequiredInfluenceForAction(normalizedSettings, action)
       if (requiredInfluence) {
         recordInfluenceClaim(state, player.name, requiredInfluence)
         const actualPlayer = state.players.find(({ id }) => id === player.id)
@@ -808,8 +944,10 @@ export const processPassActionResponse = (state: GameState, playerName: string) 
 
     if (state.pendingAction.action === Actions.Steal) {
       addUnclaimedInfluence(targetPlayer, Influences.Captain)
-      addUnclaimedInfluence(targetPlayer, Influences.Ambassador)
+      addUnclaimedInfluence(targetPlayer, state.settings.enableInquisitor ? Influences.Inquisitor : Influences.Ambassador)
     } else if (state.pendingAction.action === Actions.Assassinate) {
+      addUnclaimedInfluence(targetPlayer, Influences.Contessa)
+    } else if (state.pendingAction.action === Actions.Examine && state.settings.allowContessaBlockExamine) {
       addUnclaimedInfluence(targetPlayer, Influences.Contessa)
     }
   }
@@ -819,8 +957,7 @@ export const processPassActionResponse = (state: GameState, playerName: string) 
     return { updateLastEventTimestamp: false }
   }
 
-  // Everyone passed — if the action player was bluffing, the bluff succeeded
-  const claimedInfluence = ActionAttributes[state.pendingAction.action].influenceRequired
+  const claimedInfluence = getRequiredInfluenceForAction(state.settings, state.pendingAction.action)
   if (claimedInfluence) {
     addClaimedInfluence(actionPlayer, claimedInfluence)
     if (!actionPlayer.influences.includes(claimedInfluence)) {
@@ -851,6 +988,12 @@ export const actionResponseHandler = async ({ roomId, playerId, response, claime
     throw new ActionNotCurrentlyAllowedError()
   }
 
+  if (!gameState.pendingAction) {
+    throw new ActionNotCurrentlyAllowedError()
+  }
+
+  const legalBlockInfluences = getLegalBlockInfluences(gameState.settings, gameState.pendingAction.action)
+
   if (response === Responses.Pass) {
     await mutateGameState(gameState, (state) => {
       if (isForcedMove) logForcedMove(state, player)
@@ -870,8 +1013,15 @@ export const actionResponseHandler = async ({ roomId, playerId, response, claime
       if (isForcedMove) logForcedMove(state, player)
 
       recordChallengeMade(state, player.name)
-      state.pendingActionChallenge = {
-        sourcePlayer: player.name
+      if (state.pendingAction?.action === Actions.Embezzle) {
+        state.pendingEmbezzleChallengeDecision = {
+          sourcePlayer: state.turnPlayer!,
+          challengePlayer: player.name,
+        }
+      } else {
+        state.pendingActionChallenge = {
+          sourcePlayer: player.name
+        }
       }
       logEvent(state, {
         event: EventMessages.ChallengePending,
@@ -884,13 +1034,20 @@ export const actionResponseHandler = async ({ roomId, playerId, response, claime
       throw new ClaimedInfluenceRequiredError()
     }
 
-    if (InfluenceAttributes[claimedInfluence].legalBlock !== gameState.pendingAction!.action) {
+    if (!legalBlockInfluences.includes(claimedInfluence)) {
       throw new ClaimedInfluenceInvalidError()
     }
 
-    if (gameState.pendingAction!.targetPlayer &&
-      player.name !== gameState.pendingAction!.targetPlayer
-    ) {
+    if (gameState.pendingAction!.targetPlayer && player.name !== gameState.pendingAction!.targetPlayer) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+
+    if (gameState.pendingAction!.action === Actions.ForeignAid && !canPlayerBlockAction({
+      gameState: getPublicGameState({ gameState, playerId }),
+      action: gameState.pendingAction.action,
+      actionPlayerName: gameState.turnPlayer!,
+      blockPlayerName: player.name,
+    })) {
       throw new ActionNotCurrentlyAllowedError()
     }
 
@@ -913,7 +1070,6 @@ export const actionResponseHandler = async ({ roomId, playerId, response, claime
         }, new Set<string>()),
       }
 
-      // Track block influence claim and bluff
       recordInfluenceClaim(state, player.name, claimedInfluence)
       const blockingPlayer = state.players.find(({ id }) => id === player.id)
       if (blockingPlayer && !blockingPlayer.influences.includes(claimedInfluence)) {
@@ -943,20 +1099,21 @@ export const actionChallengeResponseHandler = async ({ roomId, playerId, influen
   enforceSpeedRoundTimer(gameState, isForcedMove)
 
   const player = getPlayerInRoom({ gameState, playerId })
+  const requiredInfluence = getRequiredInfluenceForAction(gameState.settings, gameState.pendingAction!.action)
 
   if (!player.influences.length) {
     throw new YouAreDeadError()
   }
 
   if (!canPlayerChooseActionChallengeResponse(getPublicGameState({ gameState, playerId: player.id }))) {
-    throw new ActionNotCurrentlyAllowedError
+    throw new ActionNotCurrentlyAllowedError()
   }
 
   if (!player.influences.includes(influence)) {
     throw new MissingInfluenceError()
   }
 
-  if (InfluenceAttributes[influence].legalAction === gameState.pendingAction!.action) {
+  if (requiredInfluence && influence === requiredInfluence) {
     await mutateGameState(gameState, (state) => {
       if (isForcedMove) logForcedMove(state, player)
 
@@ -976,7 +1133,6 @@ export const actionChallengeResponseHandler = async ({ roomId, playerId, influen
         primaryPlayer: challengePlayer.name,
         secondaryPlayer: state.turnPlayer
       })
-      // Challenge failed: the action player was telling the truth
       recordInfluenceKill(state, state.turnPlayer, challengePlayer.name)
       promptPlayerToLoseInfluence(state, challengePlayer.name)
       delete state.pendingActionChallenge
@@ -1021,10 +1177,9 @@ export const actionChallengeResponseHandler = async ({ roomId, playerId, influen
         primaryPlayer: challengePlayer.name,
         secondaryPlayer: state.turnPlayer!
       })
-      // Challenge succeeded: the action player was bluffing
       recordSuccessfulChallenge(state, challengePlayer.name)
       recordInfluenceKill(state, challengePlayer.name, state.turnPlayer!)
-      const claimedInfluence = ActionAttributes[state.pendingAction!.action].influenceRequired
+      const claimedInfluence = getRequiredInfluenceForAction(state.settings, state.pendingAction!.action)
       if (claimedInfluence) {
         removeClaimedInfluence(actionPlayer, claimedInfluence)
         addUnclaimedInfluence(actionPlayer, claimedInfluence)
@@ -1057,7 +1212,7 @@ export const processPassBlockResponse = (state: GameState, playerName: string) =
     throw new UnableToFindPlayerError()
   }
 
-  const claimedInfluence = ActionAttributes[state.pendingAction.action].influenceRequired
+  const claimedInfluence = getRequiredInfluenceForAction(state.settings, state.pendingAction.action)
   if (claimedInfluence) {
     addClaimedInfluence(actionPlayer, claimedInfluence)
   }
@@ -1180,7 +1335,7 @@ export const blockChallengeResponseHandler = async ({ roomId, playerId, influenc
         throw new UnableToFindPlayerError()
       }
 
-      const claimedInfluence = ActionAttributes[state.pendingAction.action].influenceRequired
+      const claimedInfluence = getRequiredInfluenceForAction(state.settings, state.pendingAction.action)
       if (claimedInfluence) {
         addClaimedInfluence(actionPlayer, claimedInfluence)
       }
@@ -1234,7 +1389,7 @@ export const blockChallengeResponseHandler = async ({ roomId, playerId, influenc
       // Block challenge succeeded — blocker was bluffing
       recordSuccessfulChallenge(state, challengePlayer.name)
       recordInfluenceKill(state, challengePlayer.name, blockPlayer.name)
-      const claimedInfluence = ActionAttributes[state.pendingAction!.action].influenceRequired
+      const claimedInfluence = getRequiredInfluenceForAction(state.settings, state.pendingAction!.action)
       if (claimedInfluence) {
         addClaimedInfluence(actionPlayer, claimedInfluence)
       }
@@ -1315,6 +1470,154 @@ export const loseInfluencesHandler = async ({ roomId, playerId, influences, isFo
         killPlayerInfluence(state, losingPlayer.name, influence)
       }
     })
+  })
+
+  return { roomId, playerId }
+}
+
+export const chooseStartingAllegianceHandler = async ({ roomId, playerId, allegiance }: {
+  roomId: string
+  playerId: string
+  allegiance: Allegiances
+}) => {
+  const gameState = await getGameState(roomId)
+  const player = getPlayerInRoom({ gameState, playerId })
+
+  if (!canPlayerChooseStartingAllegiance(getPublicGameState({ gameState, playerId: player.id }))) {
+    throw new ActionNotCurrentlyAllowedError()
+  }
+
+  await mutateGameState(gameState, (state) => {
+    assignAllegiances(state, allegiance)
+    delete state.pendingStartingAllegiance
+  })
+
+  return { roomId, playerId }
+}
+
+export const chooseExamineInfluenceHandler = async ({ roomId, playerId, influence, isForcedMove }: {
+  roomId: string
+  playerId: string
+  influence: Influences
+  isForcedMove?: boolean
+}) => {
+  const gameState = await getGameState(roomId)
+
+  enforceSpeedRoundTimer(gameState, isForcedMove)
+
+  const player = getPlayerInRoom({ gameState, playerId })
+
+  if (!canPlayerChooseExamineInfluence(getPublicGameState({ gameState, playerId: player.id }))) {
+    throw new ActionNotCurrentlyAllowedError()
+  }
+
+  if (!player.influences.includes(influence)) {
+    throw new MissingInfluenceError()
+  }
+
+  await mutateGameState(gameState, (state) => {
+    if (isForcedMove) logForcedMove(state, player)
+    if (!state.pendingExamine) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+    state.pendingExamine.chosenInfluence = influence
+  })
+
+  return { roomId, playerId }
+}
+
+export const resolveExamineHandler = async ({ roomId, playerId, response, isForcedMove }: {
+  roomId: string
+  playerId: string
+  response: ExamineResponses
+  isForcedMove?: boolean
+}) => {
+  const gameState = await getGameState(roomId)
+
+  enforceSpeedRoundTimer(gameState, isForcedMove)
+
+  const player = getPlayerInRoom({ gameState, playerId })
+
+  if (!canPlayerResolveExamine(getPublicGameState({ gameState, playerId: player.id }))) {
+    throw new ActionNotCurrentlyAllowedError()
+  }
+
+  await mutateGameState(gameState, (state) => {
+    if (isForcedMove) logForcedMove(state, player)
+
+    if (!state.pendingExamine?.chosenInfluence) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+
+    if (response === ExamineResponses.ForceExchange) {
+      forceExchangeExaminedInfluence(state, state.pendingExamine.targetPlayer, state.pendingExamine.chosenInfluence)
+    }
+
+    delete state.pendingExamine
+    moveTurnToNextPlayer(state)
+  })
+
+  return { roomId, playerId }
+}
+
+export const embezzleChallengeDecisionHandler = async ({ roomId, playerId, response, isForcedMove }: {
+  roomId: string
+  playerId: string
+  response: EmbezzleChallengeResponses
+  isForcedMove?: boolean
+}) => {
+  const gameState = await getGameState(roomId)
+
+  enforceSpeedRoundTimer(gameState, isForcedMove)
+
+  const player = getPlayerInRoom({ gameState, playerId })
+
+  if (!canPlayerChooseEmbezzleChallengeDecision(getPublicGameState({ gameState, playerId: player.id }))) {
+    throw new ActionNotCurrentlyAllowedError()
+  }
+
+  await mutateGameState(gameState, (state) => {
+    if (isForcedMove) logForcedMove(state, player)
+
+    if (!state.pendingEmbezzleChallengeDecision || !state.pendingAction || state.pendingAction.action !== Actions.Embezzle) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+
+    const challengePlayer = state.players.find(({ name }) => name === state.pendingEmbezzleChallengeDecision?.challengePlayer)
+    const actionPlayer = state.players.find(({ name }) => name === state.pendingEmbezzleChallengeDecision?.sourcePlayer)
+
+    if (!challengePlayer || !actionPlayer) {
+      throw new UnableToFindPlayerError()
+    }
+
+    if (response === EmbezzleChallengeResponses.ProveNoDuke) {
+      if (actionPlayer.influences.includes(Influences.Duke)) {
+        throw new ActionNotCurrentlyAllowedError()
+      }
+
+      logEvent(state, {
+        event: EventMessages.ChallengeFailed,
+        primaryPlayer: challengePlayer.name,
+        secondaryPlayer: actionPlayer.name,
+      })
+      recordInfluenceKill(state, actionPlayer.name, challengePlayer.name)
+      promptPlayerToLoseInfluence(state, challengePlayer.name)
+      replaceAllLiveInfluences(state, actionPlayer.name)
+      delete state.pendingEmbezzleChallengeDecision
+      processPendingAction(state)
+    } else {
+      logEvent(state, {
+        event: EventMessages.ChallengeSuccessful,
+        primaryPlayer: challengePlayer.name,
+        secondaryPlayer: actionPlayer.name,
+      })
+      recordSuccessfulChallenge(state, challengePlayer.name)
+      recordInfluenceKill(state, challengePlayer.name, actionPlayer.name)
+      holdGrudge({ state, offended: actionPlayer.name, offender: challengePlayer.name, weight: grudgeSizes[Responses.Challenge] })
+      promptPlayerToLoseInfluence(state, actionPlayer.name)
+      delete state.pendingEmbezzleChallengeDecision
+      delete state.pendingAction
+    }
   })
 
   return { roomId, playerId }

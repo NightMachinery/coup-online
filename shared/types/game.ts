@@ -3,6 +3,7 @@ export enum Influences {
   Contessa = 'Contessa',
   Captain = 'Captain',
   Ambassador = 'Ambassador',
+  Inquisitor = 'Inquisitor',
   Duke = 'Duke',
 }
 
@@ -15,6 +16,9 @@ export enum Actions {
   Income = 'Income',
   Exchange = 'Exchange',
   Revive = 'Revive',
+  Convert = 'Convert',
+  Embezzle = 'Embezzle',
+  Examine = 'Examine',
 }
 
 export enum PlayerActions {
@@ -36,6 +40,10 @@ export enum PlayerActions {
   blockResponse = 'blockResponse',
   blockChallengeResponse = 'blockChallengeResponse',
   loseInfluences = 'loseInfluences',
+  chooseStartingAllegiance = 'chooseStartingAllegiance',
+  chooseExamineInfluence = 'chooseExamineInfluence',
+  resolveExamine = 'resolveExamine',
+  embezzleChallengeDecision = 'embezzleChallengeDecision',
   sendChatMessage = 'sendChatMessage',
   setChatMessageDeleted = 'setChatMessageDeleted',
   setEmojiOnChatMessage = 'setEmojiOnChatMessage',
@@ -44,6 +52,21 @@ export enum PlayerActions {
 export enum ServerEvents {
   gameStateChanged = 'gameStateChanged',
   error = 'error',
+}
+
+export enum Allegiances {
+  Loyalist = 'Loyalist',
+  Reformist = 'Reformist',
+}
+
+export enum ExamineResponses {
+  Return = 'Return',
+  ForceExchange = 'ForceExchange',
+}
+
+export enum EmbezzleChallengeResponses {
+  Concede = 'Concede',
+  ProveNoDuke = 'ProveNoDuke',
 }
 
 export const InfluenceAttributes: {
@@ -66,6 +89,10 @@ export const InfluenceAttributes: {
     legalAction: Actions.Exchange,
     legalBlock: Actions.Steal,
   },
+  [Influences.Inquisitor]: {
+    legalAction: Actions.Exchange,
+    legalBlock: Actions.Steal,
+  },
   [Influences.Duke]: {
     legalAction: Actions.Tax,
     legalBlock: Actions.ForeignAid,
@@ -79,6 +106,7 @@ export const ActionAttributes: {
     coinsRequired?: number;
     influenceRequired?: Influences;
     requiresTarget: boolean;
+    targetMode: 'none' | 'required' | 'optional';
   };
 } = {
   [Actions.Assassinate]: {
@@ -87,46 +115,74 @@ export const ActionAttributes: {
     coinsRequired: 3,
     influenceRequired: Influences.Assassin,
     requiresTarget: true,
+    targetMode: 'required',
   },
   [Actions.Steal]: {
     blockable: true,
     challengeable: true,
     influenceRequired: Influences.Captain,
     requiresTarget: true,
+    targetMode: 'required',
   },
   [Actions.Coup]: {
     blockable: false,
     challengeable: false,
     coinsRequired: 7,
     requiresTarget: true,
+    targetMode: 'required',
   },
   [Actions.Tax]: {
     blockable: false,
     challengeable: true,
     influenceRequired: Influences.Duke,
     requiresTarget: false,
+    targetMode: 'none',
   },
   [Actions.ForeignAid]: {
     blockable: true,
     challengeable: false,
     requiresTarget: false,
+    targetMode: 'none',
   },
   [Actions.Income]: {
     blockable: false,
     challengeable: false,
     requiresTarget: false,
+    targetMode: 'none',
   },
   [Actions.Exchange]: {
     blockable: false,
     challengeable: true,
     influenceRequired: Influences.Ambassador,
     requiresTarget: false,
+    targetMode: 'none',
   },
   [Actions.Revive]: {
     blockable: false,
     challengeable: false,
     coinsRequired: 10,
     requiresTarget: false,
+    targetMode: 'none',
+  },
+  [Actions.Convert]: {
+    blockable: false,
+    challengeable: false,
+    coinsRequired: 1,
+    requiresTarget: false,
+    targetMode: 'optional',
+  },
+  [Actions.Embezzle]: {
+    blockable: false,
+    challengeable: true,
+    requiresTarget: false,
+    targetMode: 'none',
+  },
+  [Actions.Examine]: {
+    blockable: true,
+    challengeable: true,
+    influenceRequired: Influences.Inquisitor,
+    requiresTarget: true,
+    targetMode: 'required',
   },
 };
 
@@ -186,6 +242,7 @@ export type Player = {
   unclaimedInfluences: Set<Influences>;
   deadInfluences: Influences[];
   name: string;
+  allegiance?: Allegiances;
   ai: boolean;
   personalityHidden?: boolean;
   personality?: AiPersonality;
@@ -232,6 +289,9 @@ export type GameSettings = {
   allowRevive: boolean;
   aiMoveDelayMs?: number;
   speedRoundSeconds?: number;
+  enableReformation?: boolean;
+  enableInquisitor?: boolean;
+  allowContessaBlockExamine?: boolean;
 };
 
 export type ChatMessage = {
@@ -276,6 +336,21 @@ type DehydratedPendingBlock = Omit<PendingBlock, 'pendingPlayers'> & {
   pendingPlayers: string[];
 };
 
+export type PendingStartingAllegiance = {
+  sourcePlayer: string;
+};
+
+export type PendingExamine = {
+  sourcePlayer: string;
+  targetPlayer: string;
+  chosenInfluence?: Influences;
+};
+
+export type PendingEmbezzleChallengeDecision = {
+  sourcePlayer: string;
+  challengePlayer: string;
+};
+
 export type GameState = {
   deck: Influences[];
   eventLogs: EventMessage[];
@@ -298,6 +373,10 @@ export type GameState = {
       putBackInDeck: boolean;
     }[];
   };
+  pendingStartingAllegiance?: PendingStartingAllegiance;
+  pendingExamine?: PendingExamine;
+  pendingEmbezzleChallengeDecision?: PendingEmbezzleChallengeDecision;
+  treasuryReserveCoins: number;
   roomId: string;
   turnPlayer?: string;
   turn: number;
@@ -334,6 +413,10 @@ export type PublicGameState = Pick<
   | 'roomId'
   | 'turn'
   | 'settings'
+  | 'pendingStartingAllegiance'
+  | 'pendingExamine'
+  | 'pendingEmbezzleChallengeDecision'
+  | 'treasuryReserveCoins'
 > &
   Partial<
     Pick<

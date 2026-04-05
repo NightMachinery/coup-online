@@ -54,7 +54,7 @@ export function TranslationContextProvider({ children }: Readonly<{ children: Re
     if (variables.count !== undefined) {
       template = template.replaceAll('{{count}}', variables.count.toString())
       const pluralRegex = /\{\{plural\[\[(.+?)\]\]\}\}/g
-      template = template.replaceAll(pluralRegex, (replaceMatch) => {
+      template = template.replaceAll(pluralRegex, (replaceMatch: string) => {
         const plural = replaceMatch.matchAll(pluralRegex).next().value?.[1]
         return (variables.count !== 1 && plural) || ''
       })

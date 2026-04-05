@@ -20,6 +20,9 @@ import { useTranslationContext } from '../../contexts/TranslationsContext'
 import { useAuthContext } from '../../contexts/AuthContext'
 import {
   allowReviveStorageKey,
+  allowContessaBlockExamineStorageKey,
+  enableInquisitorStorageKey,
+  enableReformationStorageKey,
   eventLogRetentionTurnsStorageKey,
   speedRoundEnabledStorageKey,
   speedRoundSecondsStorageKey,
@@ -37,6 +40,9 @@ function CreateGame() {
   const [allowRevive, setAllowRevive] = usePersistedState<boolean>(allowReviveStorageKey, false)
   const [speedRoundEnabled, setSpeedRoundEnabled] = usePersistedState<boolean>(speedRoundEnabledStorageKey, false)
   const [speedRoundSeconds, setSpeedRoundSeconds] = usePersistedState<number>(speedRoundSecondsStorageKey, 10)
+  const [enableReformation, setEnableReformation] = usePersistedState<boolean>(enableReformationStorageKey, false)
+  const [enableInquisitor, setEnableInquisitor] = usePersistedState<boolean>(enableInquisitorStorageKey, false)
+  const [allowContessaBlockExamine, setAllowContessaBlockExamine] = usePersistedState<boolean>(allowContessaBlockExamineStorageKey, false)
   const navigate = useNavigate()
   const { t } = useTranslationContext()
   const { user, isLocalAuth } = useAuthContext()
@@ -102,6 +108,9 @@ function CreateGame() {
             settings: {
               eventLogRetentionTurns,
               allowRevive,
+              enableReformation,
+              enableInquisitor,
+              allowContessaBlockExamine: enableInquisitor && allowContessaBlockExamine,
               ...(speedRoundEnabled && { speedRoundSeconds }),
             },
             ...(user && { uid: user.uid }),
@@ -116,7 +125,7 @@ function CreateGame() {
               <TextField
                 name="coup-game-player-name"
                 autoComplete="off"
-                data-testid="playerNameInput"
+                slotProps={{ htmlInput: { 'data-testid': 'playerNameInput' } }}
                 value={visiblePlayerName}
                 onChange={(event) => {
                   setNameSaveError(null)
@@ -197,6 +206,54 @@ function CreateGame() {
                   onChange={(_: Event, value: number) => {
                     setSpeedRoundSeconds(value)
                   }}
+                />
+              </Box>
+            </Grid>
+          )}
+          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
+            <Box mt={2}>
+              <CoupTypography component="span" mt={2} addTextShadow>
+                {t('enableReformation')}:
+              </CoupTypography>
+              <Switch
+                checked={enableReformation}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  setEnableReformation(event.target.checked)
+                }}
+                slotProps={{ input: { 'aria-label': 'controlled' } }}
+              />
+            </Box>
+          </Grid>
+          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
+            <Box mt={2}>
+              <CoupTypography component="span" mt={2} addTextShadow>
+                {t('enableInquisitor')}:
+              </CoupTypography>
+              <Switch
+                checked={enableInquisitor}
+                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                  const enabled = event.target.checked
+                  setEnableInquisitor(enabled)
+                  if (!enabled) {
+                    setAllowContessaBlockExamine(false)
+                  }
+                }}
+                slotProps={{ input: { 'aria-label': 'controlled' } }}
+              />
+            </Box>
+          </Grid>
+          {enableInquisitor && (
+            <Grid sx={{ maxWidth: '300px', width: '90%' }}>
+              <Box mt={2}>
+                <CoupTypography component="span" mt={2} addTextShadow>
+                  {t('allowContessaBlockExamine')}:
+                </CoupTypography>
+                <Switch
+                  checked={allowContessaBlockExamine}
+                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
+                    setAllowContessaBlockExamine(event.target.checked)
+                  }}
+                  slotProps={{ input: { 'aria-label': 'controlled' } }}
                 />
               </Box>
             </Grid>

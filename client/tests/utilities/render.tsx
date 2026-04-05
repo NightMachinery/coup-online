@@ -38,6 +38,7 @@ export const getRandomGameState = (): PublicGameState => {
     isStarted: true,
     selfIsCreator: false,
     pendingInfluenceLoss: {},
+    treasuryReserveCoins: 0,
     turnPlayer: chance.string(),
     deckCount: chance.natural({ min: 0, max: 15 }),
     selfPlayer: {

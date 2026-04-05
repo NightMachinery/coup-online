@@ -125,7 +125,7 @@ function JoinGame() {
             <Box sx={{ display: 'flex', alignItems: 'flex-end' }}>
               <Group sx={{ color: 'action.active', mr: 1, my: 0.5 }} />
               <TextField
-                data-testid='roomIdInput'
+                slotProps={{ htmlInput: { 'data-testid': 'roomIdInput' } }}
                 value={roomId}
                 onChange={(event) => {
                   setRoomId(event.target.value.slice(0, 6).toUpperCase())
@@ -143,9 +143,8 @@ function JoinGame() {
                 name="coup-game-player-name"
                 autoComplete="off"
                 slotProps={{
-                  htmlInput: { ref: playerNameInputRef }
+                  htmlInput: { ref: playerNameInputRef, 'data-testid': 'playerNameInput' }
                 }}
-                data-testid='playerNameInput'
                 value={visiblePlayerName}
                 onChange={(event) => {
                   setNameSaveError(null)

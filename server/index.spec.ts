@@ -573,6 +573,12 @@ describe('index', () => {
             } = response
             const roomId = gameState?.roomId
 
+            await postApi(PlayerActions.joinGame, {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              playerName: chance.string({ length: 10 }),
+            })
+
             return { roomId, playerId: chance.string({ length: 10 }) }
           },
           error: 'Player is not in the game',
@@ -679,6 +685,12 @@ describe('index', () => {
               json: { gameState },
             } = response
             const roomId = gameState?.roomId
+
+            await postApi(PlayerActions.joinGame, {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              playerName: chance.string({ length: 10 }),
+            })
 
             return { roomId, playerId: chance.string({ length: 10 }) }
           },
@@ -884,6 +896,12 @@ describe('index', () => {
             } = response
             const roomId = gameState?.roomId
 
+            await postApi(PlayerActions.joinGame, {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              playerName: chance.string({ length: 10 }),
+            })
+
             return { roomId, playerId: chance.string({ length: 10 }) }
           },
           error: 'Player is not in the game',
@@ -1014,9 +1032,15 @@ describe('index', () => {
             } = response
             const roomId = gameState?.roomId
 
+            await postApi(PlayerActions.joinGame, {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              playerName: chance.string({ length: 10 }),
+            })
+
             return { roomId, playerId: chance.string({ length: 10 }) }
           },
-          error: 'Player is not in the game',
+          error: 'Only the lobby creator can start the game',
           status: 400,
         },
         {

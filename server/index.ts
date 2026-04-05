@@ -3,8 +3,8 @@ import express, { NextFunction, Request, Response } from 'express'
 import { json } from 'body-parser'
 import cors from 'cors'
 import Joi, { ObjectSchema } from 'joi'
-import { Actions, Influences, Responses, DehydratedPublicGameState, PlayerActions, ServerEvents, AiPersonality, GameSettings, PlayerControllers } from '../shared/types/game'
-import { actionChallengeResponseHandler, actionHandler, actionResponseHandler, addAiPlayerHandler, blockChallengeResponseHandler, blockResponseHandler, checkAutoMoveHandler, createGameHandler, setChatMessageDeletedHandler, getGameStateHandler, joinGameHandler, loseInfluencesHandler, removeFromGameHandler, resetGameHandler, resetGameRequestCancelHandler, resetGameRequestHandler, sendChatMessageHandler, setPlayerControllerHandler, startGameHandler, setEmojiOnChatMessageHandler, forfeitGameHandler } from './src/game/actionHandlers'
+import { Actions, Allegiances, EmbezzleChallengeResponses, ExamineResponses, Influences, Responses, DehydratedPublicGameState, PlayerActions, ServerEvents, AiPersonality, GameSettings, PlayerControllers } from '../shared/types/game'
+import { actionChallengeResponseHandler, actionHandler, actionResponseHandler, addAiPlayerHandler, blockChallengeResponseHandler, blockResponseHandler, checkAutoMoveHandler, chooseExamineInfluenceHandler, chooseStartingAllegianceHandler, createGameHandler, embezzleChallengeDecisionHandler, setChatMessageDeletedHandler, getGameStateHandler, joinGameHandler, loseInfluencesHandler, removeFromGameHandler, resetGameHandler, resetGameRequestCancelHandler, resetGameRequestHandler, resolveExamineHandler, sendChatMessageHandler, setPlayerControllerHandler, startGameHandler, setEmojiOnChatMessageHandler, forfeitGameHandler } from './src/game/actionHandlers'
 import { GameMutationInputError, WrongPlayerIdOnSocketError } from './src/utilities/errors'
 import { Server as ioServer, Socket } from 'socket.io'
 import { getGameState, getPublicGameState } from './src/utilities/gameState'
@@ -140,7 +140,10 @@ const eventHandlers: {
         eventLogRetentionTurns: Joi.number().integer().min(1).max(100).required(),
         allowRevive: Joi.bool().required(),
         aiMoveDelayMs: Joi.number().integer().min(0).max(10000),
-        speedRoundSeconds: Joi.number().integer().min(5).max(60)
+        speedRoundSeconds: Joi.number().integer().min(5).max(60),
+        enableReformation: Joi.bool(),
+        enableInquisitor: Joi.bool(),
+        allowContessaBlockExamine: Joi.bool()
       }).required(),
       language: languageRule,
       uid: Joi.string().optional(),
@@ -348,6 +351,86 @@ const eventHandlers: {
     joiSchema: Joi.object().keys({
       roomId: Joi.string().required(),
       playerId: Joi.string().required(),
+      language: languageRule
+    })
+  },
+  [PlayerActions.chooseStartingAllegiance]: {
+    handler: chooseStartingAllegianceHandler,
+    express: {
+      method: 'post',
+      parseParams: (req) => {
+        const roomId: string = req.body.roomId
+        const playerId: string = req.body.playerId
+        const allegiance: Allegiances = req.body.allegiance
+        const language: AvailableLanguageCode = req.body.language
+        return { roomId, playerId, allegiance, language }
+      },
+      validator: validateExpressBody
+    },
+    joiSchema: Joi.object().keys({
+      roomId: Joi.string().required(),
+      playerId: Joi.string().required(),
+      allegiance: Joi.string().allow(...Object.values(Allegiances)).required(),
+      language: languageRule
+    })
+  },
+  [PlayerActions.chooseExamineInfluence]: {
+    handler: chooseExamineInfluenceHandler,
+    express: {
+      method: 'post',
+      parseParams: (req) => {
+        const roomId: string = req.body.roomId
+        const playerId: string = req.body.playerId
+        const influence: Influences = req.body.influence
+        const language: AvailableLanguageCode = req.body.language
+        return { roomId, playerId, influence, language }
+      },
+      validator: validateExpressBody
+    },
+    joiSchema: Joi.object().keys({
+      roomId: Joi.string().required(),
+      playerId: Joi.string().required(),
+      influence: Joi.string().allow(...Object.values(Influences)).required(),
+      language: languageRule
+    })
+  },
+  [PlayerActions.resolveExamine]: {
+    handler: resolveExamineHandler,
+    express: {
+      method: 'post',
+      parseParams: (req) => {
+        const roomId: string = req.body.roomId
+        const playerId: string = req.body.playerId
+        const response: ExamineResponses = req.body.response
+        const language: AvailableLanguageCode = req.body.language
+        return { roomId, playerId, response, language }
+      },
+      validator: validateExpressBody
+    },
+    joiSchema: Joi.object().keys({
+      roomId: Joi.string().required(),
+      playerId: Joi.string().required(),
+      response: Joi.string().allow(...Object.values(ExamineResponses)).required(),
+      language: languageRule
+    })
+  },
+  [PlayerActions.embezzleChallengeDecision]: {
+    handler: embezzleChallengeDecisionHandler,
+    express: {
+      method: 'post',
+      parseParams: (req) => {
+        const roomId: string = req.body.roomId
+        const playerId: string = req.body.playerId
+        const response: EmbezzleChallengeResponses = req.body.response
+        const language: AvailableLanguageCode = req.body.language
+        return { roomId, playerId, response, language }
+      },
+      validator: validateExpressBody
+    },
+    joiSchema: Joi.object().keys({
+      roomId: Joi.string().required(),
+      playerId: Joi.string().required(),
+      response: Joi.string().allow(...Object.values(EmbezzleChallengeResponses)).required(),
       language: languageRule
     })
   },

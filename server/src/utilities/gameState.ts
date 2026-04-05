@@ -7,7 +7,7 @@ import { compressString, decompressString } from './compression'
 import { getCurrentTimestamp } from './time'
 import { MAX_PLAYER_COUNT } from '../../../shared/helpers/playerCount'
 import { GAME_STATE_TTL_SECONDS } from '../../../shared/helpers/constants'
-import { getCountOfEachInfluence } from './deck'
+import { createDeckForPlayerCount, getCountOfEachInfluence } from './deck'
 import { recordGameStats } from './stats'
 import { getPublicSpectatorsForRoom, getRoomPresence } from './roomPresence'
 
@@ -66,6 +66,7 @@ export const getPublicGameState = ({ gameState, playerId }: {
       color: player.color,
       ai: player.ai,
       grudges: player.grudges,
+      ...(player.allegiance && { allegiance: player.allegiance }),
       ...(player.uid && { uid: player.uid }),
       ...(player.photoURL && { photoURL: player.photoURL }),
       ...(!player.personalityHidden && player.personality && { personality: player.personality }),
@@ -83,6 +84,7 @@ export const getPublicGameState = ({ gameState, playerId }: {
       text: chatMessage.deleted ? '' : chatMessage.text
     })),
     settings: gameState.settings,
+    treasuryReserveCoins: gameState.treasuryReserveCoins,
     lastEventTimestamp: gameState.lastEventTimestamp,
     isStarted: gameState.isStarted,
     selfIsCreator,
@@ -110,6 +112,22 @@ export const getPublicGameState = ({ gameState, playerId }: {
   }
   if (gameState.pendingAction) {
     publicGameState.pendingAction = gameState.pendingAction
+  }
+  if (gameState.pendingStartingAllegiance) {
+    publicGameState.pendingStartingAllegiance = gameState.pendingStartingAllegiance
+  }
+  if (gameState.pendingExamine) {
+    publicGameState.pendingExamine = {
+      ...gameState.pendingExamine,
+      ...((playerId === gameState.players.find(({ name }) => name === gameState.pendingExamine?.sourcePlayer)?.id
+        || playerId === gameState.players.find(({ name }) => name === gameState.pendingExamine?.targetPlayer)?.id)
+        && gameState.pendingExamine.chosenInfluence
+        ? { chosenInfluence: gameState.pendingExamine.chosenInfluence }
+        : {})
+    }
+  }
+  if (gameState.pendingEmbezzleChallengeDecision) {
+    publicGameState.pendingEmbezzleChallengeDecision = gameState.pendingEmbezzleChallengeDecision
   }
   if (gameState.pendingActionChallenge) {
     publicGameState.pendingActionChallenge = gameState.pendingActionChallenge
@@ -152,9 +170,13 @@ export const validateGameState = (state: DehydratedGameState) => {
   })
 
   const countOfEachInfluence = getCountOfEachInfluence(state.players.length)
-  if (Object.values(cardCounts).some((count) => count !== countOfEachInfluence)) {
-    throw new IncorrectTotalCardCountError()
-  }
+  const expectedInfluences = new Set(createDeckForPlayerCount(state.players.length, state.settings))
+  Object.entries(cardCounts).forEach(([influence, count]) => {
+    const expectedCount = expectedInfluences.has(influence as Influences) ? countOfEachInfluence : 0
+    if (count !== expectedCount) {
+      throw new IncorrectTotalCardCountError()
+    }
+  })
 
   if ((
     state.pendingAction?.pendingPlayers?.length === 0

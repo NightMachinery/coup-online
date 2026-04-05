@@ -26,6 +26,14 @@ export const getWaitingOnPlayers = (gameState: PublicGameState): PublicPlayer[] 
     if (pendingBlockPlayer) {
       waitingOnNames.add(pendingBlockPlayer)
     }
+  } else if (gameState.pendingExamine) {
+    if (gameState.pendingExamine.chosenInfluence) {
+      waitingOnNames.add(gameState.pendingExamine.sourcePlayer)
+    } else {
+      waitingOnNames.add(gameState.pendingExamine.targetPlayer)
+    }
+  } else if (gameState.pendingEmbezzleChallengeDecision) {
+    waitingOnNames.add(gameState.pendingEmbezzleChallengeDecision.sourcePlayer)
   } else if (gameState.pendingBlock) {
     gameState.pendingBlock?.pendingPlayers.forEach(waitingOnNames.add, waitingOnNames)
   } else if (gameState.pendingActionChallenge) {
@@ -34,6 +42,8 @@ export const getWaitingOnPlayers = (gameState: PublicGameState): PublicPlayer[] 
     }
   } else if (gameState.pendingAction) {
     gameState.pendingAction?.pendingPlayers.forEach(waitingOnNames.add, waitingOnNames)
+  } else if (gameState.pendingStartingAllegiance) {
+    waitingOnNames.add(gameState.pendingStartingAllegiance.sourcePlayer)
   }
 
   const pendingInfluenceLossPlayers = Object.keys(gameState.pendingInfluenceLoss)

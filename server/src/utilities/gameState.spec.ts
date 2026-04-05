@@ -76,6 +76,7 @@ const getRandomGameState = ({
     availablePlayerColors: chance.n(chance.color, MAX_PLAYER_COUNT),
     players: [],
     pendingInfluenceLoss: {},
+    treasuryReserveCoins: 0,
     roomId: chance.string(),
     turn: chance.natural(),
     settings: { eventLogRetentionTurns: 100, allowRevive: true },
@@ -135,6 +136,7 @@ describe('gameState', () => {
         creatorDisplayName: lobbyCreator.name,
         turn: gameState.turn,
         pendingInfluenceLoss: gameState.pendingInfluenceLoss,
+        treasuryReserveCoins: gameState.treasuryReserveCoins,
         roomId: gameState.roomId,
         deckCount:
           5 * getCountOfEachInfluence(gameState.players.length) -

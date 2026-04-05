@@ -135,6 +135,21 @@ function WaitingRoom() {
                   {t('reviveIsEnabled')}
                 </CoupTypography>
               )}
+              {gameState.settings.enableReformation && (
+                <CoupTypography mt={2} addTextShadow>
+                  {t('enableReformation')}
+                </CoupTypography>
+              )}
+              {gameState.settings.enableInquisitor && (
+                <CoupTypography mt={2} addTextShadow>
+                  {t('enableInquisitor')}
+                </CoupTypography>
+              )}
+              {gameState.settings.allowContessaBlockExamine && (
+                <CoupTypography mt={2} addTextShadow>
+                  {t('allowContessaBlockExamine')}
+                </CoupTypography>
+              )}
               {gameState.settings.speedRoundSeconds && (
                 <CoupTypography mt={2} addTextShadow>
                   {t('speedRoundSeconds')}: {gameState.settings.speedRoundSeconds}

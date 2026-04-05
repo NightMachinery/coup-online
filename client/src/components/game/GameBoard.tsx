@@ -138,6 +138,13 @@ function GameBoard({ leftDrawerOpen, rightDrawerOpen }: Readonly<GameBoardProps>
               </CoupTypography>
             </Tooltip>
           </Grid>
+          {gameState.settings.enableReformation && (
+            <Grid size={12}>
+              <CoupTypography addTextShadow>
+                {t('treasuryReserve')}: {gameState.treasuryReserveCoins}
+              </CoupTypography>
+            </Grid>
+          )}
           <Grid size={12}>
             <RequestReset />
           </Grid>

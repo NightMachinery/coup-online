@@ -1,6 +1,6 @@
 import { Grid } from "@mui/material"
-import { ActionAttributes, Actions, EventMessages, InfluenceAttributes, Influences, PlayerActions, Responses } from '@shared'
-import { useState } from "react"
+import { ActionAttributes, Actions, EventMessages, Influences, PlayerActions, Responses, getLegalBlockInfluences } from '@shared'
+import { useMemo, useState } from "react"
 import { getPlayerId } from "../../helpers/players"
 import { useGameStateContext } from "../../contexts/GameStateContext"
 import PlayerActionConfirmation from "./PlayerActionConfirmation"
@@ -15,61 +15,71 @@ function ChooseActionResponse() {
   const { gameState } = useGameStateContext()
   const { t } = useTranslationContext()
 
+  const legalBlockInfluences = useMemo(() => (
+    gameState?.pendingAction
+      ? getLegalBlockInfluences(gameState.settings, gameState.pendingAction.action)
+      : []
+  ), [gameState])
+
   if (!gameState?.selfPlayer || !gameState?.pendingAction) {
     return null
   }
 
+  const pendingAction = gameState.pendingAction
+
   if (selectedResponse && (selectedResponse !== Responses.Block || selectedInfluence)) {
-    return <PlayerActionConfirmation
-      message={selectedInfluence
-        ? t('blockAsInfluence', {
-          gameState,
-          primaryInfluence: selectedInfluence
-        })
-        : t(selectedResponse)}
-      action={PlayerActions.actionResponse}
-      variables={{
-        claimedInfluence: selectedInfluence,
-        playerId: getPlayerId(),
-        response: selectedResponse,
-        roomId: gameState.roomId
-      }}
-      onCancel={() => {
-        setSelectedResponse(undefined)
-        setSelectedInfluence(undefined)
-      }}
-    />
+    return (
+      <PlayerActionConfirmation
+        message={selectedInfluence
+          ? t('blockAsInfluence', {
+            gameState,
+            primaryInfluence: selectedInfluence,
+          })
+          : t(selectedResponse)}
+        action={PlayerActions.actionResponse}
+        variables={{
+          ...(selectedInfluence && { claimedInfluence: selectedInfluence }),
+          playerId: getPlayerId(),
+          response: selectedResponse,
+          roomId: gameState.roomId,
+        }}
+        onCancel={() => {
+          setSelectedResponse(undefined)
+          setSelectedInfluence(undefined)
+        }}
+      />
+    )
   }
 
-  if (selectedResponse) {
+  if (selectedResponse === Responses.Block) {
     return (
       <>
         <CoupTypography
           my={1}
           variant="h6"
           fontWeight="bold"
-          onBack={() => { setSelectedResponse(undefined) }}
+          onBack={() => {
+            setSelectedResponse(undefined)
+          }}
           addTextShadow
         >
           {t('claimAnInfluence')}
         </CoupTypography>
         <Grid container spacing={2} justifyContent="center">
-          {Object.entries(InfluenceAttributes)
-            .sort((a, b) => a[0].localeCompare(b[0]))
-            .map(([influence, influenceAttributes]) => {
-              if (influenceAttributes.legalBlock !== gameState.pendingAction?.action) {
-                return null
-              }
-
-              return <GrowingButton
+          {legalBlockInfluences
+            .sort((a, b) => a.localeCompare(b))
+            .map((influence) => (
+              <GrowingButton
                 key={influence}
                 onClick={() => {
-                  setSelectedInfluence(influence as Influences)
+                  setSelectedInfluence(influence)
                 }}
-                color={influence as Influences}
+                color={influence}
                 variant="contained"
-              >{t(influence as Influences)}</GrowingButton>
-            })}
+              >
+                {t(influence as never)}
+              </GrowingButton>
+            ))}
         </Grid>
       </>
     )
@@ -79,42 +89,55 @@ function ChooseActionResponse() {
     <>
       <CoupTypography variant="h6" sx={{ fontWeight: 'bold', my: 1 }} addTextShadow>
         {t(EventMessages.ActionPending, {
-          action: gameState.pendingAction.action,
+          action: pendingAction.action,
           gameState,
           primaryPlayer: gameState.turnPlayer!,
-          secondaryPlayer: gameState.pendingAction.targetPlayer
+          secondaryPlayer: pendingAction.targetPlayer,
         })}
       </CoupTypography>
       <Grid container spacing={2} justifyContent="center">
         {Object.values(Responses)
           .sort((a, b) => a[0].localeCompare(b[0]))
           .map((response, index) => {
-            if (response === Responses.Challenge &&
-              (!ActionAttributes[gameState.pendingAction?.action as Actions].challengeable
+            if (
+              response === Responses.Challenge
+              && (
+                !ActionAttributes[pendingAction.action].challengeable
                 || gameState.pendingActionChallenge
-                || gameState.pendingAction?.claimConfirmed)) {
+                || pendingAction.claimConfirmed
+              )
+            ) {
               return null
             }
 
-            if (response === Responses.Block &&
-              (!ActionAttributes[gameState.pendingAction?.action as Actions].blockable ||
-                (gameState.pendingAction?.targetPlayer &&
-                  gameState.selfPlayer!.name !== gameState.pendingAction?.targetPlayer
-                ))) {
+            if (
+              response === Responses.Block
+              && (
+                !ActionAttributes[pendingAction.action].blockable
+                || !legalBlockInfluences.length
+                || (
+                  pendingAction.targetPlayer
+                  && gameState.selfPlayer!.name !== pendingAction.targetPlayer
+                )
+              )
+            ) {
               return null
             }
 
             const ResponseIcon = getResponseIcon(response)
 
-            return <GrowingButton
-              key={index}
-              onClick={() => {
-                setSelectedResponse(response as Responses)
-              }} variant="contained"
-              startIcon={<ResponseIcon />}
-            >
-              {t(response)}
-            </GrowingButton>
+            return (
+              <GrowingButton
+                key={index}
+                onClick={() => {
+                  setSelectedResponse(response)
+                }}
+                variant="contained"
+                startIcon={<ResponseIcon />}
+              >
+                {t(response)}
+              </GrowingButton>
+            )
           })}
       </Grid>
     </>

@@ -47,6 +47,7 @@ const getRandomGameState = ({
     availablePlayerColors: chance.n(chance.color, MAX_PLAYER_COUNT),
     players,
     pendingInfluenceLoss: {},
+    treasuryReserveCoins: 0,
     roomId: chance.string(),
     turn: chance.natural(),
     turnPlayer: chance.pickone(players).name,

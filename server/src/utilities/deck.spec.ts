@@ -31,7 +31,7 @@ describe('createDeckForPlayerCount', () => {
   it.each(
     [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((playerCount) => ({ playerCount })),
   )(
-    'should return a deck with correct number of each influence for $playerCount players',
+    'should return a standard deck with correct number of each influence for $playerCount players',
     ({ playerCount }) => {
       const deck = createDeckForPlayerCount(playerCount)
       const counts = Object.fromEntries(
@@ -42,8 +42,36 @@ describe('createDeckForPlayerCount', () => {
         counts[card]++
       })
 
-      Object.values(counts).forEach((count) => {
-        expect(count).toBe(getCountOfEachInfluence(playerCount))
+      expect(counts[Influences.Inquisitor]).toBe(0)
+      Object.entries(counts).forEach(([influence, count]) => {
+        const expectedCount = influence === Influences.Inquisitor
+          ? 0
+          : getCountOfEachInfluence(playerCount)
+        expect(count).toBe(expectedCount)
+      })
+    },
+  )
+
+  it.each(
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((playerCount) => ({ playerCount })),
+  )(
+    'should return an inquisitor deck with correct number of each influence for $playerCount players',
+    ({ playerCount }) => {
+      const deck = createDeckForPlayerCount(playerCount, { enableInquisitor: true })
+      const counts = Object.fromEntries(
+        Object.values(Influences).map((influence) => [influence, 0]),
+      )
+
+      deck.forEach((card) => {
+        counts[card]++
+      })
+
+      expect(counts[Influences.Ambassador]).toBe(0)
+      Object.entries(counts).forEach(([influence, count]) => {
+        const expectedCount = influence === Influences.Ambassador
+          ? 0
+          : getCountOfEachInfluence(playerCount)
+        expect(count).toBe(expectedCount)
       })
     },
   )

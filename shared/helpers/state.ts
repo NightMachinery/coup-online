@@ -47,6 +47,15 @@ const dehydrateCommonGameState = (hydrated: GameState | PublicGameState) => ({
   ...(hydrated.pendingInfluenceLoss && {
     pendingInfluenceLoss: hydrated.pendingInfluenceLoss
   }),
+  ...(hydrated.pendingStartingAllegiance && {
+    pendingStartingAllegiance: hydrated.pendingStartingAllegiance
+  }),
+  ...(hydrated.pendingExamine && {
+    pendingExamine: hydrated.pendingExamine
+  }),
+  ...(hydrated.pendingEmbezzleChallengeDecision && {
+    pendingEmbezzleChallengeDecision: hydrated.pendingEmbezzleChallengeDecision
+  }),
   ...(hydrated.resetGameRequest && {
     resetGameRequest: hydrated.resetGameRequest
   }),
@@ -59,6 +68,7 @@ export const dehydrateGameState = (hydrated: GameState): DehydratedGameState => 
   ...dehydrateCommonGameState(hydrated),
   deck: hydrated.deck,
   settings: hydrated.settings,
+  treasuryReserveCoins: hydrated.treasuryReserveCoins,
   availablePlayerColors: hydrated.availablePlayerColors,
   ...(hydrated.creatorPlayerId !== undefined && { creatorPlayerId: hydrated.creatorPlayerId }),
   players: hydrated.players.map((player) => ({
@@ -74,6 +84,7 @@ export const dehydratePublicGameState = (hydrated: PublicGameState): DehydratedP
   ...dehydrateCommonGameState(hydrated),
   deckCount: hydrated.deckCount,
   settings: hydrated.settings,
+  treasuryReserveCoins: hydrated.treasuryReserveCoins,
   selfIsCreator: hydrated.selfIsCreator,
   ...(hydrated.creatorPlayerName !== undefined && { creatorPlayerName: hydrated.creatorPlayerName }),
   ...(hydrated.creatorDisplayName !== undefined && { creatorDisplayName: hydrated.creatorDisplayName }),
@@ -130,6 +141,15 @@ const rehydrateCommonGameState = (dehydrated: DehydratedGameState | DehydratedPu
   ...(dehydrated.pendingInfluenceLoss && {
     pendingInfluenceLoss: dehydrated.pendingInfluenceLoss
   }),
+  ...(dehydrated.pendingStartingAllegiance && {
+    pendingStartingAllegiance: dehydrated.pendingStartingAllegiance
+  }),
+  ...(dehydrated.pendingExamine && {
+    pendingExamine: dehydrated.pendingExamine
+  }),
+  ...(dehydrated.pendingEmbezzleChallengeDecision && {
+    pendingEmbezzleChallengeDecision: dehydrated.pendingEmbezzleChallengeDecision
+  }),
   ...(dehydrated.resetGameRequest && {
     resetGameRequest: dehydrated.resetGameRequest
   }),
@@ -143,6 +163,7 @@ export const rehydrateGameState = (dehydrated: DehydratedGameState): GameState =
     ...rehydrateCommonGameState(dehydrated),
     deck: dehydrated.deck,
     settings: dehydrated.settings,
+    treasuryReserveCoins: dehydrated.treasuryReserveCoins,
     availablePlayerColors: dehydrated.availablePlayerColors,
     ...(dehydrated.creatorPlayerId !== undefined && { creatorPlayerId: dehydrated.creatorPlayerId }),
     players: dehydrated.players.map((player) => ({
@@ -159,6 +180,7 @@ export const rehydratePublicGameState = (dehydrated: DehydratedPublicGameState):
   ...rehydrateCommonGameState(dehydrated),
   deckCount: dehydrated.deckCount,
   settings: dehydrated.settings,
+  treasuryReserveCoins: dehydrated.treasuryReserveCoins,
   selfIsCreator: dehydrated.selfIsCreator,
   ...(dehydrated.creatorPlayerName !== undefined && { creatorPlayerName: dehydrated.creatorPlayerName }),
   ...(dehydrated.creatorDisplayName !== undefined && { creatorDisplayName: dehydrated.creatorDisplayName }),

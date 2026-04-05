@@ -105,13 +105,17 @@ export function MaterialThemeContextProvider({
       [Influences.Contessa]: isLightMode ? '#9B6000' : '#C38E3A',
       [Influences.Captain]: isLightMode ? '#00338A' : '#3868BA',
       [Influences.Ambassador]: isLightMode ? '#3D6600' : '#78A831',
+      [Influences.Inquisitor]: isLightMode ? '#0D5C63' : '#45A9B2',
       [Influences.Duke]: isLightMode ? '#73007B' : '#AA35B2',
     }
 
     const actionColors = {
       [Actions.Assassinate]: influenceColors[Influences.Assassin],
+      [Actions.Convert]: isLightMode ? '#7A4A00' : '#C8842E',
       [Actions.Coup]: primaryColor,
+      [Actions.Embezzle]: isLightMode ? '#8A1F11' : '#D05D4D',
       [Actions.Exchange]: influenceColors[Influences.Ambassador],
+      [Actions.Examine]: influenceColors[Influences.Inquisitor],
       [Actions.ForeignAid]: primaryColor,
       [Actions.Income]: primaryColor,
       [Actions.Revive]: primaryColor,

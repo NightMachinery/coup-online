@@ -1,6 +1,9 @@
 import {
+  Allegiances,
   Actions,
+  EmbezzleChallengeResponses,
   EventMessages,
+  ExamineResponses,
   Influences,
   Responses,
   AvailableLanguageCode,
@@ -9,26 +12,31 @@ import { AlertColor } from '@mui/material'
 
 type TranslationsForString = { [key in AvailableLanguageCode]: string }
 
-type ActionMessages = {
-  [Actions.Assassinate]: TranslationsForString
-  [Actions.Coup]: TranslationsForString
-  [Actions.Exchange]: TranslationsForString
-  [Actions.ForeignAid]: TranslationsForString
-  [Actions.Income]: TranslationsForString
-  [Actions.Revive]: TranslationsForString
-  [Actions.Steal]: TranslationsForString
-  [Actions.Tax]: TranslationsForString
-}
+type ActionMessages = Record<Actions, TranslationsForString>
+type InfluenceMessages = Record<Influences, TranslationsForString>
+type AllegianceMessages = Record<Allegiances, TranslationsForString>
+type ExamineResponseMessages = Record<ExamineResponses, TranslationsForString>
+type EmbezzleChallengeResponseMessages = Record<EmbezzleChallengeResponses, TranslationsForString>
 
 type AlertColorTranslations = { [key in AlertColor]: TranslationsForString }
 
+const untranslated = (value: string): TranslationsForString =>
+  Object.fromEntries(
+    Object.values(AvailableLanguageCode).map((code) => [code, value])
+  ) as TranslationsForString
+
 export type Translations = ActionMessages &
+  InfluenceMessages &
+  AllegianceMessages &
+  ExamineResponseMessages &
+  EmbezzleChallengeResponseMessages &
   AlertColorTranslations & {
     action: TranslationsForString
     actions: TranslationsForString
     add: TranslationsForString
     addAiPlayer: TranslationsForString
     addPlayersToStartGame: TranslationsForString
+    allowContessaBlockExamine: TranslationsForString
     allowRevive: TranslationsForString
     anyone: TranslationsForString
     block: TranslationsForString
@@ -41,10 +49,13 @@ export type Translations = ActionMessages &
     cheatSheet: TranslationsForString
     chooseATarget: TranslationsForString
     chooseAnAction: TranslationsForString
+    chooseEmbezzleChallengeDecision: TranslationsForString
+    chooseExamineResponse: TranslationsForString
     chooseInfluenceToLose: TranslationsForString
     chooseInfluenceToReveal: TranslationsForString
     chooseInfluencesToKeep: TranslationsForString
     choosePersonality: TranslationsForString
+    chooseStartingAllegiance: TranslationsForString
     claimAnInfluence: TranslationsForString
     close: TranslationsForString
     collectCoins: TranslationsForString
@@ -60,6 +71,8 @@ export type Translations = ActionMessages &
     effect: TranslationsForString
     eventLog: TranslationsForString
     eventLogRetentionTurns: TranslationsForString
+    enableInquisitor: TranslationsForString
+    enableReformation: TranslationsForString
     [EventMessages.ActionConfirm]: ActionMessages
     [EventMessages.ActionPending]: Partial<ActionMessages>
     [EventMessages.ActionProcessed]: ActionMessages
@@ -93,11 +106,6 @@ export type Translations = ActionMessages &
     influence: TranslationsForString
     influenceWasClaimed: TranslationsForString
     influences: TranslationsForString
-    [Influences.Ambassador]: TranslationsForString
-    [Influences.Assassin]: TranslationsForString
-    [Influences.Captain]: TranslationsForString
-    [Influences.Contessa]: TranslationsForString
-    [Influences.Duke]: TranslationsForString
     inviteLinkCopied: TranslationsForString
     joinExistingGame: TranslationsForString
     joinGame: TranslationsForString
@@ -133,6 +141,7 @@ export type Translations = ActionMessages &
     reviveAnInfluence: TranslationsForString
     reviveIsEnabled: TranslationsForString
     room: TranslationsForString
+    treasuryReserve: TranslationsForString
     rules: TranslationsForString
     rulesActions: TranslationsForString
     rulesAmbassador: TranslationsForString
@@ -369,6 +378,9 @@ const translations: Translations = {
     'it-IT': 'Tassa',
     'pt-BR': 'Imposto',
   },
+  [Actions.Convert]: untranslated('Convert'),
+  [Actions.Embezzle]: untranslated('Embezzle'),
+  [Actions.Examine]: untranslated('Examine'),
   add: {
     'de-DE': 'Hinzufügen',
     'en-US': 'Add',
@@ -406,6 +418,7 @@ const translations: Translations = {
     'it-IT': 'Permetti Rivivere',
     'pt-BR': 'Permitir Reviver',
   },
+  allowContessaBlockExamine: untranslated('Contessa can block Examine'),
   anyone: {
     'de-DE': 'Jeder',
     'en-US': 'Anyone',
@@ -550,6 +563,8 @@ const translations: Translations = {
     'it-IT': "Scegli un'Azione",
     'pt-BR': 'Escolher uma Ação',
   },
+  chooseEmbezzleChallengeDecision: untranslated('Choose how to respond to the Embezzle challenge'),
+  chooseExamineResponse: untranslated('Choose how to resolve Examine'),
   chooseInfluenceToLose: {
     'de-DE': 'Wähle eine Einflusskarte, die du verlieren möchtest',
     'en-US': 'Choose an influence to lose',
@@ -587,6 +602,7 @@ const translations: Translations = {
     'it-IT': 'Scegli una Personalità',
     'pt-BR': 'Escolher uma Personalidade',
   },
+  chooseStartingAllegiance: untranslated('Choose starting allegiance'),
   claimAnInfluence: {
     'de-DE': 'Beanspruche eine Einflusskarte',
     'en-US': 'Claim an Influence',
@@ -803,6 +819,8 @@ const translations: Translations = {
     'it-IT': 'Conservazione del registro eventi (turni)',
     'pt-BR': 'Retenção do registro de eventos (turnos)',
   },
+  enableInquisitor: untranslated('Enable Inquisitor'),
+  enableReformation: untranslated('Enable Reformation'),
   [EventMessages.ActionConfirm]: {
     [Actions.Assassinate]: {
       'de-DE': '{{action[[Attentat]]}} {{secondaryPlayer}}',
@@ -876,6 +894,9 @@ const translations: Translations = {
       'it-IT': 'Raccogli {{action[[Tassa]]}}',
       'pt-BR': 'Coletar {{action[[Imposto]]}}',
     },
+    [Actions.Convert]: untranslated('{{action[[Convert]]}}'),
+    [Actions.Embezzle]: untranslated('{{action[[Embezzle]]}}'),
+    [Actions.Examine]: untranslated('{{action[[Examine]]}} {{secondaryPlayer}}'),
   },
   [EventMessages.ActionPending]: {
     [Actions.Assassinate]: {
@@ -951,6 +972,9 @@ const translations: Translations = {
         '{{primaryPlayer}} sta cercando di raccogliere {{action[[Tassa]]}}',
       'pt-BR': '{{primaryPlayer}} está tentando coletar {{action[[Imposto]]}}',
     },
+    [Actions.Convert]: untranslated('{{primaryPlayer}} is trying to {{action[[Convert]]}}'),
+    [Actions.Embezzle]: untranslated('{{primaryPlayer}} is trying to {{action[[Embezzle]]}}'),
+    [Actions.Examine]: untranslated('{{primaryPlayer}} is trying to {{action[[Examine]]}} {{secondaryPlayer}}'),
   },
   [EventMessages.ActionProcessed]: {
     [Actions.Assassinate]: {
@@ -1038,6 +1062,9 @@ const translations: Translations = {
       'it-IT': '{{primaryPlayer}} ha raccolto {{action[[Tassa]]}}',
       'pt-BR': '{{primaryPlayer}} coletou {{action[[Imposto]]}}',
     },
+    [Actions.Convert]: untranslated('{{primaryPlayer}} {{action[[Converted]]}}'),
+    [Actions.Embezzle]: untranslated('{{primaryPlayer}} {{action[[Embezzled]]}}'),
+    [Actions.Examine]: untranslated('{{primaryPlayer}} {{action[[Examined]]}} {{secondaryPlayer}}'),
   },
   [EventMessages.BlockFailed]: {
     'de-DE': '{{primaryPlayer}} konnte {{secondaryPlayer}} nicht blocken',
@@ -1430,6 +1457,13 @@ const translations: Translations = {
     'it-IT': 'Duca',
     'pt-BR': 'Duque',
   },
+  [Influences.Inquisitor]: untranslated('Inquisitor'),
+  [Allegiances.Loyalist]: untranslated('Loyalist'),
+  [Allegiances.Reformist]: untranslated('Reformist'),
+  [ExamineResponses.Return]: untranslated('Return card'),
+  [ExamineResponses.ForceExchange]: untranslated('Force exchange'),
+  [EmbezzleChallengeResponses.Concede]: untranslated('Concede'),
+  [EmbezzleChallengeResponses.ProveNoDuke]: untranslated('Prove no Duke'),
   info: {
     'de-DE': 'Info',
     'en-US': 'Info',
@@ -1941,6 +1975,7 @@ const translations: Translations = {
     'it-IT': 'Stanza',
     'pt-BR': 'Sala',
   },
+  treasuryReserve: untranslated('Treasury Reserve'),
   rules: {
     'de-DE': 'Regeln',
     'en-US': 'Rules',

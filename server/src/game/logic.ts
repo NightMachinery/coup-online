@@ -1,12 +1,25 @@
 import crypto from 'node:crypto'
 import { shuffle } from "../utilities/array"
-import { ActionAttributes, Actions, AiPersonality, EventMessages, GameSettings, GameState, Influences, Player, Responses } from "../../../shared/types/game"
+import { ActionAttributes, Actions, AiPersonality, Allegiances, EventMessages, GameSettings, GameState, Influences, Player, Responses } from "../../../shared/types/game"
 import { emptyPlayerActionStats } from "../../../shared/types/user"
 import { createGameState, drawCardFromDeck, getGameState, logEvent, shuffleDeck } from "../utilities/gameState"
 import { createDeckForPlayerCount } from "../utilities/deck"
 import { ActionNotCurrentlyAllowedError, UnableToDetermineNextPlayerTurnError, UnableToFindPlayerError } from "../utilities/errors"
 import { MAX_PLAYER_COUNT } from "../../../shared/helpers/playerCount"
+import { getOpposingAllegiance } from '../../../shared/game/logic'
 import { recordTurnSurvived, recordAssassination, recordInfluenceKill, recordSteal } from './statsAccumulator'
+
+
+export const getLivingPlayers = (state: Pick<GameState, 'players'>) =>
+  state.players.filter(({ influences }) => influences.length)
+
+export const assignAllegiances = (state: GameState, startingAllegiance: Allegiances) => {
+  let currentAllegiance = startingAllegiance
+  state.players.forEach((player) => {
+    player.allegiance = currentAllegiance
+    currentAllegiance = getOpposingAllegiance(currentAllegiance)
+  })
+}
 
 export const killPlayerInfluence = (state: GameState, playerName: string, influence: Influences) => {
   const player = state.players.find(({ name }) => name === playerName)
@@ -100,10 +113,15 @@ export const processPendingAction = (state: GameState) => {
   } else if (state.pendingAction.action === Actions.Exchange) {
     removeClaimedInfluence(actionPlayer)
     removeUnclaimedInfluence(actionPlayer)
-    actionPlayer.influences.push(drawCardFromDeck(state), drawCardFromDeck(state))
+    actionPlayer.influences.push(drawCardFromDeck(state))
+    if (!state.settings.enableInquisitor) {
+      actionPlayer.influences.push(drawCardFromDeck(state))
+    }
     state.deck = shuffle(state.deck)
     promptPlayerToLoseInfluence(state, actionPlayer.name, true)
-    promptPlayerToLoseInfluence(state, actionPlayer.name, true)
+    if (!state.settings.enableInquisitor) {
+      promptPlayerToLoseInfluence(state, actionPlayer.name, true)
+    }
   } else if (state.pendingAction.action === Actions.ForeignAid) {
     actionPlayer.coins += 2
   } else if (state.pendingAction.action === Actions.Steal) {
@@ -118,6 +136,20 @@ export const processPendingAction = (state: GameState) => {
     targetPlayer.coins -= coinsAvailable
   } else if (state.pendingAction.action === Actions.Tax) {
     actionPlayer.coins += 3
+  } else if (state.pendingAction.action === Actions.Embezzle) {
+    actionPlayer.coins += state.treasuryReserveCoins
+    state.treasuryReserveCoins = 0
+  } else if (state.pendingAction.action === Actions.Examine) {
+    if (!targetPlayer) {
+      throw new UnableToFindPlayerError()
+    }
+
+    state.pendingExamine = {
+      sourcePlayer: actionPlayer.name,
+      targetPlayer: targetPlayer.name,
+    }
+    delete state.pendingAction
+    return
   }
 
   if (!Object.keys(state.pendingInfluenceLoss).length) {
@@ -158,8 +190,9 @@ const getNewGameState = (roomId: string, settings: GameSettings): GameState => (
   roomId,
   availablePlayerColors: distributeColorsWithFixedStep(getEvenlySpacedHueColors(MAX_PLAYER_COUNT)),
   players: [],
-  deck: shuffle(createDeckForPlayerCount(0)),
+  deck: shuffle(createDeckForPlayerCount(0, settings)),
   pendingInfluenceLoss: {},
+  treasuryReserveCoins: 0,
   isStarted: false,
   eventLogs: [],
   chatMessages: [],
@@ -209,7 +242,7 @@ export const addPlayerToGame = ({
       }
     })
   })
-  state.deck = createDeckForPlayerCount(state.players.length)
+  state.deck = createDeckForPlayerCount(state.players.length, state.settings)
 }
 
 export const removePlayerFromGame = (state: GameState, playerName: string) => {
@@ -218,7 +251,7 @@ export const removePlayerFromGame = (state: GameState, playerName: string) => {
     1
   )[0]
   state.availablePlayerColors.push(player.color)
-  state.deck = createDeckForPlayerCount(state.players.length)
+  state.deck = createDeckForPlayerCount(state.players.length, state.settings)
 }
 
 export const createNewGame = async (roomId: string, playerId: string, playerName: string, gameSettings: GameSettings, uid?: string, photoURL?: string) => {
@@ -236,6 +269,7 @@ export const startGame = (gameState: GameState) => {
   )
   gameState.players = shuffle(gameState.players)
   gameState.players.forEach((player) => {
+    delete player.allegiance
     player.influences.push(...Array.from({ length: 2 }, () => drawCardFromDeck(gameState)))
   })
   if (gameState.players.length === 2) {
@@ -243,6 +277,9 @@ export const startGame = (gameState: GameState) => {
   }
   gameState.turn = 1
   gameState.turnPlayer = gameState.players[0].name
+  if (gameState.settings.enableReformation) {
+    gameState.pendingStartingAllegiance = { sourcePlayer: gameState.players[0].name }
+  }
   logEvent(gameState, {
     event: EventMessages.GameStarted
   })
@@ -264,9 +301,12 @@ export const resetGame = async (roomId: string) => {
     claimedInfluences: new Set(),
     unclaimedInfluences: new Set(),
     deadInfluences: [],
-    grudges: {}
+    grudges: {},
   }))
-  newGameState.deck = createDeckForPlayerCount(newGameState.players.length)
+  newGameState.players.forEach((player) => {
+    delete player.allegiance
+  })
+  newGameState.deck = createDeckForPlayerCount(newGameState.players.length, newGameState.settings)
   newGameState.availablePlayerColors = oldGameState.availablePlayerColors
   newGameState.chatMessages = oldGameState.chatMessages
   await createGameState(roomId, newGameState)

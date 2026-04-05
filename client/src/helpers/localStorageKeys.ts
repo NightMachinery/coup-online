@@ -9,6 +9,9 @@ export const eventLogRetentionTurnsStorageKey = 'coupEventLogRetentionTurns'
 export const allowReviveStorageKey = 'coupAllowRevive'
 export const speedRoundEnabledStorageKey = 'coupSpeedRoundEnabled'
 export const speedRoundSecondsStorageKey = 'coupSpeedRoundSeconds'
+export const enableReformationStorageKey = 'coupEnableReformation'
+export const enableInquisitorStorageKey = 'coupEnableInquisitor'
+export const allowContessaBlockExamineStorageKey = 'coupAllowContessaBlockExamine'
 export const chooseAiPersonalityStorageKey = 'coupChooseAiPersonality'
 export const getLatestReadMessageIdStorageKey = (roomId: string) =>
   `coupLatestReadMessageId-${roomId}`
