@@ -236,11 +236,6 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
                         >
                           {t('assignToSpectator')}
                         </Button>
-                        {!availableSpectators.length && (
-                          <Typography variant="caption" sx={{ color: cardTextColor }}>
-                            {t('noConnectedSpectators')}
-                          </Typography>
-                        )}
                       </>
                     )}
                   </Box>

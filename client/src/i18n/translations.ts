@@ -235,7 +235,6 @@ export type Translations = ActionMessages &
     // Display name
     displayName: TranslationsForString
     nameFromProfile: TranslationsForString
-    noConnectedSpectators: TranslationsForString
     setDisplayName: TranslationsForString
     changeDisplayName: TranslationsForString
     inappropriateDisplayName: TranslationsForString
@@ -1641,15 +1640,6 @@ const translations: Translations = {
     'hi-IN': 'अभी तक कोई उपलब्धि नहीं',
     'it-IT': 'Nessun obiettivo raggiunto',
     'pt-BR': 'Nenhuma conquista ainda',
-  },
-  noConnectedSpectators: {
-    'de-DE': 'Keine verbundenen Zuschauer verfügbar',
-    'en-US': 'No connected spectators available',
-    'es-MX': 'No hay espectadores conectados disponibles',
-    'fr-FR': 'Aucun spectateur connecté disponible',
-    'hi-IN': 'कोई जुड़ा हुआ दर्शक उपलब्ध नहीं है',
-    'it-IT': 'Nessuno spettatore connesso disponibile',
-    'pt-BR': 'Nenhum espectador conectado disponível',
   },
   onlyLobbyCreatorCanStartGame: {
     'de-DE': 'Nur {{primaryPlayer}} kann das Spiel starten',
