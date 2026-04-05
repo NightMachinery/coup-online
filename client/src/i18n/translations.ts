@@ -47,6 +47,8 @@ export type Translations = ActionMessages &
     challenge: TranslationsForString
     chat: TranslationsForString
     cheatSheet: TranslationsForString
+    changeAnotherPlayersAllegiance: TranslationsForString
+    changeYourAllegiance: TranslationsForString
     chooseATarget: TranslationsForString
     chooseAnAction: TranslationsForString
     chooseEmbezzleChallengeDecision: TranslationsForString
@@ -62,6 +64,7 @@ export type Translations = ActionMessages &
     colorMode: TranslationsForString
     confirm: TranslationsForString
     confirmActions: TranslationsForString
+    contessaBlockExamineSummary: TranslationsForString
     contents: TranslationsForString
     copyInviteLink: TranslationsForString
     createGame: TranslationsForString
@@ -73,6 +76,7 @@ export type Translations = ActionMessages &
     eventLogRetentionTurns: TranslationsForString
     enableInquisitor: TranslationsForString
     enableReformation: TranslationsForString
+    exchangeOneCardWithCourtDeck: TranslationsForString
     [EventMessages.ActionConfirm]: ActionMessages
     [EventMessages.ActionPending]: Partial<ActionMessages>
     [EventMessages.ActionProcessed]: ActionMessages
@@ -106,6 +110,8 @@ export type Translations = ActionMessages &
     influence: TranslationsForString
     influenceWasClaimed: TranslationsForString
     influences: TranslationsForString
+    inquisitorSummary: TranslationsForString
+    inspectOpponentInfluence: TranslationsForString
     inviteLinkCopied: TranslationsForString
     joinExistingGame: TranslationsForString
     joinGame: TranslationsForString
@@ -122,6 +128,7 @@ export type Translations = ActionMessages &
     noDeadInfluences: TranslationsForString
     notEnoughCoins: TranslationsForString
     numberOfPlayers: TranslationsForString
+    optional: TranslationsForString
     pageNotFound: TranslationsForString
     payCoins: TranslationsForString
     personalityIsHidden: TranslationsForString
@@ -133,6 +140,7 @@ export type Translations = ActionMessages &
     reportBug: TranslationsForString
     reportIncorrectTranslation: TranslationsForString
     requestFeature: TranslationsForString
+    reformationSummary: TranslationsForString
     resetGame: TranslationsForString
     [Responses.Block]: TranslationsForString
     [Responses.Challenge]: TranslationsForString
@@ -140,6 +148,7 @@ export type Translations = ActionMessages &
     revealInfluence: TranslationsForString
     reviveAnInfluence: TranslationsForString
     reviveIsEnabled: TranslationsForString
+    reviveSummary: TranslationsForString
     room: TranslationsForString
     treasuryReserve: TranslationsForString
     rules: TranslationsForString
@@ -153,18 +162,30 @@ export type Translations = ActionMessages &
     rulesContents: TranslationsForString
     rulesContessa: TranslationsForString
     rulesCoup: TranslationsForString
+    rulesExamine: TranslationsForString
+    rulesExamineAllegianceRestriction: TranslationsForString
     rulesDuke: TranslationsForString
+    rulesEmbezzle: TranslationsForString
     rulesExchange: TranslationsForString
+    rulesExchangeInquisitor: TranslationsForString
     rulesForeignAid: TranslationsForString
     rulesGoal: TranslationsForString
     rulesIncome: TranslationsForString
+    rulesInquisitor: TranslationsForString
+    rulesInquisitorReplacement: TranslationsForString
     rulesInfluences: TranslationsForString
     rulesLosingAChallenge: TranslationsForString
     rulesLosingInfluence: TranslationsForString
+    rulesReformationRestrictions: TranslationsForString
     rulesRevive: TranslationsForString
     rulesSetup: TranslationsForString
+    rulesSetupReformation: TranslationsForString
     rulesSteal: TranslationsForString
     rulesTax: TranslationsForString
+    rulesContentsReformation: TranslationsForString
+    rulesContessaBlockExamine: TranslationsForString
+    rulesConvert: TranslationsForString
+    rulesTreasuryReserve: TranslationsForString
     send: TranslationsForString
     settings: TranslationsForString
     setup: TranslationsForString
@@ -180,6 +201,7 @@ export type Translations = ActionMessages &
     startingPlayerBeginsWith1Coin: TranslationsForString
     steal2CoinsFromSomeone: TranslationsForString
     system: TranslationsForString
+    takeAllTreasuryReserveCoins: TranslationsForString
     title: TranslationsForString
     vengefulness: TranslationsForString
     waitingOnOtherPlayers: TranslationsForString
@@ -408,6 +430,7 @@ const translations: Translations = {
     'it-IT': 'Aggiungi almeno un altro giocatore per iniziare il gioco',
     'pt-BR': 'Adicione pelo menos mais um jogador para iniciar o jogo',
   },
+  allowContessaBlockExamine: untranslated('Contessa can block Examine'),
   allowRevive: {
     'de-DE': 'Wiederbeleben erlauben',
     'en-US': 'Allow Revive',
@@ -417,7 +440,6 @@ const translations: Translations = {
     'it-IT': 'Permetti Rivivere',
     'pt-BR': 'Permitir Reviver',
   },
-  allowContessaBlockExamine: untranslated('Contessa can block Examine'),
   anyone: {
     'de-DE': 'Jeder',
     'en-US': 'Anyone',
@@ -435,6 +457,15 @@ const translations: Translations = {
     'hi-IN': 'हत्याएँ',
     'it-IT': 'Assassinii',
     'pt-BR': 'Assassinatos',
+  },
+  assignToSpectator: {
+    'de-DE': 'An Zuschauer geben',
+    'en-US': 'Assign to Spectator',
+    'es-MX': 'Asignar a espectador',
+    'fr-FR': 'Assigner à un spectateur',
+    'hi-IN': 'दर्शक को सौंपें',
+    'it-IT': 'Assegna a spettatore',
+    'pt-BR': 'Atribuir ao espectador',
   },
   bestStreak: {
     'de-DE': 'Beste Serie',
@@ -517,6 +548,7 @@ const translations: Translations = {
     'it-IT': 'Precisione sfide',
     'pt-BR': 'Precisão de desafios',
   },
+  changeAnotherPlayersAllegiance: untranslated('Pay 2 coins to change another player\'s Allegiance'),
   changeDisplayName: {
     'de-DE': 'Anzeigename ändern',
     'en-US': 'Change Display Name',
@@ -526,6 +558,7 @@ const translations: Translations = {
     'it-IT': 'Cambia nome',
     'pt-BR': 'Alterar nome',
   },
+  changeYourAllegiance: untranslated('Pay 1 coin to change your Allegiance'),
   chat: {
     'de-DE': 'Chat',
     'en-US': 'Chat',
@@ -674,6 +707,7 @@ const translations: Translations = {
     'it-IT': 'Contenuti',
     'pt-BR': 'Conteúdo',
   },
+  contessaBlockExamineSummary: untranslated('Optional rule: Contessa may block Examine.'),
   copyInviteLink: {
     'de-DE': 'Einladungslink kopieren',
     'en-US': 'Copy Invite Link',
@@ -791,6 +825,8 @@ const translations: Translations = {
     'it-IT': 'Effetto',
     'pt-BR': 'Efeito',
   },
+  enableInquisitor: untranslated('Enable Inquisitor'),
+  enableReformation: untranslated('Enable Reformation'),
   error: {
     'de-DE': 'Fehler',
     'en-US': 'Error',
@@ -818,8 +854,7 @@ const translations: Translations = {
     'it-IT': 'Conservazione del registro eventi (turni)',
     'pt-BR': 'Retenção do registro de eventos (turnos)',
   },
-  enableInquisitor: untranslated('Enable Inquisitor'),
-  enableReformation: untranslated('Enable Reformation'),
+  exchangeOneCardWithCourtDeck: untranslated('Draw 1 card, return 1 card'),
   [EventMessages.ActionConfirm]: {
     [Actions.Assassinate]: {
       'de-DE': '{{action[[Attentat]]}} {{secondaryPlayer}}',
@@ -1224,15 +1259,6 @@ const translations: Translations = {
     'it-IT': '{{secondaryPlayer}} ora controlla {{primaryPlayer}}',
     'pt-BR': '{{secondaryPlayer}} agora controla {{primaryPlayer}}',
   },
-  assignToSpectator: {
-    'de-DE': 'An Zuschauer geben',
-    'en-US': 'Assign to Spectator',
-    'es-MX': 'Asignar a espectador',
-    'fr-FR': 'Assigner à un spectateur',
-    'hi-IN': 'दर्शक को सौंपें',
-    'it-IT': 'Assegna a spettatore',
-    'pt-BR': 'Atribuir ao espectador',
-  },
   fastestWin: {
     'de-DE': 'Schnellster Sieg',
     'en-US': 'Fastest Win',
@@ -1472,6 +1498,8 @@ const translations: Translations = {
     'it-IT': 'Info',
     'pt-BR': 'Info',
   },
+  inquisitorSummary: untranslated('Inquisitor is enabled: Inquisitor replaces Ambassador, Exchanges one card, can Examine an opponent, and can block Steal.'),
+  inspectOpponentInfluence: untranslated('Examine 1 opponent card and may force Exchange'),
   inviteLinkCopied: {
     'de-DE': 'Einladungslink kopiert',
     'en-US': 'Invite link copied',
@@ -1641,15 +1669,6 @@ const translations: Translations = {
     'it-IT': 'Nessun obiettivo raggiunto',
     'pt-BR': 'Nenhuma conquista ainda',
   },
-  onlyLobbyCreatorCanStartGame: {
-    'de-DE': 'Nur {{primaryPlayer}} kann das Spiel starten',
-    'en-US': 'Only {{primaryPlayer}} can start the game',
-    'es-MX': 'Solo {{primaryPlayer}} puede iniciar el juego',
-    'fr-FR': 'Seul {{primaryPlayer}} peut démarrer la partie',
-    'hi-IN': 'केवल {{primaryPlayer}} ही खेल शुरू कर सकता है',
-    'it-IT': 'Solo {{primaryPlayer}} può avviare la partita',
-    'pt-BR': 'Somente {{primaryPlayer}} pode iniciar o jogo',
-  },
   noChatMessages: {
     'de-DE': 'Keine Chat-Nachrichten',
     'en-US': 'No chat messages',
@@ -1713,6 +1732,15 @@ const translations: Translations = {
     'it-IT': 'Numero di Giocatori',
     'pt-BR': 'Número de Jogadores',
   },
+  onlyLobbyCreatorCanStartGame: {
+    'de-DE': 'Nur {{primaryPlayer}} kann das Spiel starten',
+    'en-US': 'Only {{primaryPlayer}} can start the game',
+    'es-MX': 'Solo {{primaryPlayer}} puede iniciar el juego',
+    'fr-FR': 'Seul {{primaryPlayer}} peut démarrer la partie',
+    'hi-IN': 'केवल {{primaryPlayer}} ही खेल शुरू कर सकता है',
+    'it-IT': 'Solo {{primaryPlayer}} può avviare la partita',
+    'pt-BR': 'Somente {{primaryPlayer}} pode iniciar o jogo',
+  },
   opponent: {
     'de-DE': 'Gegner',
     'en-US': 'Opponent',
@@ -1722,6 +1750,7 @@ const translations: Translations = {
     'it-IT': 'Avversario',
     'pt-BR': 'Adversário',
   },
+  optional: untranslated('Optional'),
   pageNotFound: {
     'de-DE': 'Seite nicht gefunden',
     'en-US': 'Page not found',
@@ -1866,6 +1895,7 @@ const translations: Translations = {
     'it-IT': 'Record',
     'pt-BR': 'Histórico',
   },
+  reformationSummary: untranslated('Reformation is enabled: players start on alternating allegiances, same-allegiance players cannot Coup, Assassinate, Steal from, or block Foreign Aid against each other unless everyone shares one allegiance.'),
   reportBug: {
     'de-DE': 'Fehler melden',
     'en-US': 'Report Bug',
@@ -1956,6 +1986,7 @@ const translations: Translations = {
     'it-IT': 'La resurrezione è abilitata',
     'pt-BR': 'Reviver está habilitado',
   },
+  reviveSummary: untranslated('Revive is enabled: pay 10 coins to revive one of your dead influences.'),
   room: {
     'de-DE': 'Raum',
     'en-US': 'Room',
@@ -1965,7 +1996,6 @@ const translations: Translations = {
     'it-IT': 'Stanza',
     'pt-BR': 'Sala',
   },
-  treasuryReserve: untranslated('Treasury Reserve'),
   rules: {
     'de-DE': 'Regeln',
     'en-US': 'Rules',
@@ -2088,6 +2118,7 @@ const translations: Translations = {
     'it-IT': "Mazzo di carte d'influenza, banca di monete.",
     'pt-BR': 'Baralho de cartas de influência, banco de moedas.',
   },
+  rulesContentsReformation: untranslated('Reformation also uses Allegiance cards and a Treasury Reserve.'),
   rulesContessa: {
     'de-DE': 'Kann Attentate blockieren.',
     'en-US': 'Can Block assassination attempts.',
@@ -2097,6 +2128,8 @@ const translations: Translations = {
     'it-IT': 'Può bloccare i tentativi di assassinio.',
     'pt-BR': 'Pode bloquear tentativas de assassinato.',
   },
+  rulesContessaBlockExamine: untranslated('Optional rule: Contessa may also block Examine.'),
+  rulesConvert: untranslated('Pay one coin to change your own Allegiance, or two coins to change another player’s Allegiance. Coins paid go to the Treasury Reserve. Cannot be Challenged or Blocked.'),
   rulesCoup: {
     'de-DE':
       'Kostet sieben Münzen. Zwingt einen Spieler, eine Einflusskarte aufzugeben. Kann nicht herausgefordert oder blockiert werden. Wenn du deinen Zug mit zehn oder mehr Münzen beginnst, musst du einen Putsch durchführen (oder wiederbeleben, wenn aktiviert).',
@@ -2122,6 +2155,9 @@ const translations: Translations = {
     'it-IT': "Può tassare e bloccare l'Aiuto Estero.",
     'pt-BR': 'Pode cobrar impostos e bloquear Ajuda Estrangeira.',
   },
+  rulesEmbezzle: untranslated('Take all coins from the Treasury Reserve by claiming you do not have the Duke. If Challenged, you may concede and lose an Influence, or prove you have no Duke; if you prove it, the challenger loses an Influence and your live cards are replaced from the deck.'),
+  rulesExamine: untranslated('Look at one opponent’s chosen Influence card and either return it or force that player to Exchange it. Can be Challenged. Can be Blocked only if the optional Contessa rule is enabled.'),
+  rulesExamineAllegianceRestriction: untranslated('Examine also cannot target a player of the same Allegiance unless all living players share one Allegiance.'),
   rulesExchange: {
     'de-DE':
       'Ziehe zwei Karten vom Deck, schaue sie dir an und mische sie mit deinen aktuellen Einflusskarten. Lege zwei Karten zurück in den Stapel und mische den Stapel. Kann herausgefordert werden. Kann nicht blockiert werden.',
@@ -2138,6 +2174,7 @@ const translations: Translations = {
     'pt-BR':
       'Puxe duas cartas de influência do baralho, olhe para elas e misture-as com suas cartas de influência atuais. Coloque duas cartas de volta no baralho e embaralhe o baralho. Pode ser desafiado. Não pode ser bloqueado.',
   },
+  rulesExchangeInquisitor: untranslated('Draw one random card from the deck, choose whether to exchange it with one of your Influence cards, then return one card to the deck. Can be Challenged. Cannot be Blocked.'),
   rulesForeignAid: {
     'de-DE':
       'Nimm zwei Münzen aus der Bank. Kann nicht herausgefordert werden. Kann vom Herzog blockiert werden.',
@@ -2185,6 +2222,8 @@ const translations: Translations = {
     'it-IT': 'Ci sono cinque personaggi diversi nel mazzo di influenza.',
     'pt-BR': 'Existem cinco personagens diferentes no baralho de influência.',
   },
+  rulesInquisitor: untranslated('Can Exchange one card with the deck, Examine an opponent’s card, and block Steal.'),
+  rulesInquisitorReplacement: untranslated('When Inquisitor is enabled, it replaces Ambassador in the deck.'),
   rulesLosingAChallenge: {
     'de-DE':
       'Jeder Spieler, der eine Herausforderung verliert, muss eine ihrer Einflusskarten aufdecken, damit alle sie sehen können. Wenn das ihre letzte Einflusskarte ist, scheiden sie aus dem Spiel aus.',
@@ -2217,6 +2256,7 @@ const translations: Translations = {
     'pt-BR':
       'Sempre que um jogador perder uma carta de influência, ele escolhe qual de suas cartas revelar.',
   },
+  rulesReformationRestrictions: untranslated('Players cannot Coup, Assassinate, Steal from, or block Foreign Aid against players of the same Allegiance unless all living players share one Allegiance.'),
   rulesRevive: {
     'de-DE':
       'Nicht im Standardspiel verfügbar, kann aber beim Erstellen eines neuen Spiels aktiviert werden. Kostet zehn Münzen. Belebt eine Einflusskarte aus dem Ablagestapel wieder. Kann nicht herausgefordert oder blockiert werden.',
@@ -2249,6 +2289,7 @@ const translations: Translations = {
     'pt-BR':
       'Embaralhe as cartas e distribua duas para cada jogador. Os jogadores devem olhar suas cartas, mas mantê-las escondidas dos outros. Cada jogador pega duas moedas do banco como sua riqueza inicial. Em um jogo com apenas dois jogadores, o jogador inicial começa o jogo com uma moeda em vez de duas.',
   },
+  rulesSetupReformation: untranslated('If Reformation is enabled, place the Treasury Reserve in the center. The starting player chooses Loyalist or Reformist, then each player clockwise alternates allegiance from the previous player.'),
   rulesSteal: {
     'de-DE':
       'Nimm zwei Münzen von einem anderen Spieler. Kann herausgefordert werden. Kann von Kapitän oder Botschafter blockiert werden.',
@@ -2281,6 +2322,7 @@ const translations: Translations = {
     'pt-BR':
       'Pegue três moedas do banco. Pode ser desafiado. Não pode ser bloqueado.',
   },
+  rulesTreasuryReserve: untranslated('Coins paid to Convert go to the Treasury Reserve. Embezzle takes all coins from the Treasury Reserve.'),
   save: {
     'de-DE': 'Speichern',
     'en-US': 'Save',
@@ -2289,15 +2331,6 @@ const translations: Translations = {
     'hi-IN': 'सहेजें',
     'it-IT': 'Salva',
     'pt-BR': 'Salvar',
-  },
-  switchToBot: {
-    'de-DE': 'Zu Bot wechseln',
-    'en-US': 'Switch to Bot',
-    'es-MX': 'Cambiar a bot',
-    'fr-FR': 'Passer au bot',
-    'hi-IN': 'बॉट में बदलें',
-    'it-IT': 'Passa a bot',
-    'pt-BR': 'Trocar para bot',
   },
   send: {
     'de-DE': 'Senden',
@@ -2507,6 +2540,15 @@ const translations: Translations = {
     'it-IT': 'Successo',
     'pt-BR': 'Sucesso',
   },
+  switchToBot: {
+    'de-DE': 'Zu Bot wechseln',
+    'en-US': 'Switch to Bot',
+    'es-MX': 'Cambiar a bot',
+    'fr-FR': 'Passer au bot',
+    'hi-IN': 'बॉट में बदलें',
+    'it-IT': 'Passa a bot',
+    'pt-BR': 'Trocar para bot',
+  },
   system: {
     'de-DE': 'System',
     'en-US': 'System',
@@ -2516,6 +2558,7 @@ const translations: Translations = {
     'it-IT': 'Sistema',
     'pt-BR': 'Sistema',
   },
+  takeAllTreasuryReserveCoins: untranslated('Take all Treasury Reserve coins if you claim no Duke'),
   title: {
     'de-DE': 'Coup',
     'en-US': 'Coup',
@@ -2525,6 +2568,7 @@ const translations: Translations = {
     'it-IT': 'Coup',
     'pt-BR': 'Coup',
   },
+  treasuryReserve: untranslated('Treasury Reserve'),
   tryAgain: {
     'de-DE': 'Erneut versuchen',
     'en-US': 'Try Again',

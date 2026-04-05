@@ -132,22 +132,22 @@ function WaitingRoom() {
               )}
               {gameState.settings.allowRevive && (
                 <CoupTypography mt={2} addTextShadow>
-                  {t('reviveIsEnabled')}
+                  {t('reviveSummary')}
                 </CoupTypography>
               )}
               {gameState.settings.enableReformation && (
                 <CoupTypography mt={2} addTextShadow>
-                  {t('enableReformation')}
+                  {t('reformationSummary')}
                 </CoupTypography>
               )}
               {gameState.settings.enableInquisitor && (
                 <CoupTypography mt={2} addTextShadow>
-                  {t('enableInquisitor')}
+                  {t('inquisitorSummary')}
                 </CoupTypography>
               )}
               {gameState.settings.allowContessaBlockExamine && (
                 <CoupTypography mt={2} addTextShadow>
-                  {t('allowContessaBlockExamine')}
+                  {t('contessaBlockExamineSummary')}
                 </CoupTypography>
               )}
               {gameState.settings.speedRoundSeconds && (
