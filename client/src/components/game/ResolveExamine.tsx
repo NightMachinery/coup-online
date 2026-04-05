@@ -1,5 +1,5 @@
 import { Grid } from "@mui/material"
-import { ExamineResponses, PlayerActions } from "@shared"
+import { ExamineResponses, Influences, PlayerActions } from "@shared"
 import { useState } from "react"
 import { getPlayerId } from "../../helpers/players"
 import { useGameStateContext } from "../../contexts/GameStateContext"
@@ -7,6 +7,19 @@ import PlayerActionConfirmation from "./PlayerActionConfirmation"
 import { useTranslationContext } from "../../contexts/TranslationsContext"
 import GrowingButton from "../utilities/GrowingButton"
 import CoupTypography from "../utilities/CoupTypography"
+import InfluenceCard from "./InfluenceCard"
+
+function ExaminedInfluenceCard({ influence }: {
+  influence: Influences
+}) {
+  return (
+    <Grid container justifyContent="center" sx={{ my: 2 }}>
+      <Grid sx={{ width: '100%', maxWidth: '18rem' }}>
+        <InfluenceCard influence={influence} />
+      </Grid>
+    </Grid>
+  )
+}
 
 function ResolveExamine() {
   const [selectedResponse, setSelectedResponse] = useState<ExamineResponses>()
@@ -17,20 +30,25 @@ function ResolveExamine() {
     return null
   }
 
+  const chosenInfluence = gameState.pendingExamine.chosenInfluence
+
   if (selectedResponse) {
     return (
-      <PlayerActionConfirmation
-        message={t(selectedResponse as never)}
-        action={PlayerActions.resolveExamine}
-        variables={{
-          roomId: gameState.roomId,
-          playerId: getPlayerId(),
-          response: selectedResponse,
-        }}
-        onCancel={() => {
-          setSelectedResponse(undefined)
-        }}
-      />
+      <>
+        <ExaminedInfluenceCard influence={chosenInfluence} />
+        <PlayerActionConfirmation
+          message={t(selectedResponse as never)}
+          action={PlayerActions.resolveExamine}
+          variables={{
+            roomId: gameState.roomId,
+            playerId: getPlayerId(),
+            response: selectedResponse,
+          }}
+          onCancel={() => {
+            setSelectedResponse(undefined)
+          }}
+        />
+      </>
     )
   }
 
@@ -39,6 +57,7 @@ function ResolveExamine() {
       <CoupTypography variant="h6" sx={{ fontWeight: 'bold', my: 1 }} addTextShadow>
         {t('chooseExamineResponse')}
       </CoupTypography>
+      <ExaminedInfluenceCard influence={chosenInfluence} />
       <Grid container spacing={2} justifyContent="center">
         {Object.values(ExamineResponses).map((response) => (
           <GrowingButton
