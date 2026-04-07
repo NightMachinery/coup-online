@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import WaitingRoom from './WaitingRoom'
 import { MaterialThemeContextProvider } from '../../contexts/MaterialThemeContext'
@@ -11,6 +11,7 @@ const mockGameState = {
   ],
   selfPlayer: { name: 'Alice' },
   selfIsCreator: true,
+  creatorPlayerName: 'Alice',
   creatorDisplayName: 'Alice',
   settings: {
     allowRevive: true,
@@ -98,6 +99,35 @@ describe('WaitingRoom', () => {
     expect(screen.getByText('reformationSummary')).toBeInTheDocument()
     expect(screen.getByText('inquisitorSummary')).toBeInTheDocument()
     expect(screen.getByText('contessaBlockExamineSummary')).toBeInTheDocument()
-    expect(screen.getByText(/speedRoundSeconds/)).toBeInTheDocument()
+    expect(screen.getAllByText(/speedRoundSeconds/).length).toBeGreaterThan(0)
+  })
+
+  it('shows a collapsible settings editor for allowed lobby editors', () => {
+    render(
+      <MaterialThemeContextProvider>
+        <WaitingRoom />
+      </MaterialThemeContextProvider>
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'settings' }))
+
+    expect(screen.getByText('allowRevive:')).toBeInTheDocument()
+    expect(screen.getByText('enableReformation:')).toBeInTheDocument()
+  })
+
+  it('hides the settings editor when another connected creator controls the lobby', () => {
+    mockGameState.selfIsCreator = false
+    mockGameState.selfPlayer = { name: 'Bob' }
+
+    render(
+      <MaterialThemeContextProvider>
+        <WaitingRoom />
+      </MaterialThemeContextProvider>
+    )
+
+    expect(screen.queryByRole('button', { name: 'settings' })).not.toBeInTheDocument()
+
+    mockGameState.selfIsCreator = true
+    mockGameState.selfPlayer = { name: 'Alice' }
   })
 })

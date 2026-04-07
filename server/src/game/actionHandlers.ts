@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { ActionNotChallengeableError, ActionNotCurrentlyAllowedError, BlockMayNotBeBlockedError, ClaimedInfluenceAlreadyConfirmedError, ClaimedInfluenceInvalidError, ClaimedInfluenceRequiredError, ConnectedSpectatorRequiredError, DifferentPlayerNameError, GameInProgressError, GameNeedsAtLeast2PlayersToStartError, GameNotInProgressError, GameOverError, InsufficientCoinsError, InvalidActionAt10CoinsError, MessageDoesNotExistError, MessageIsNotYoursError, MissingInfluenceError, NoDeadInfluencesError, OnlyLobbyCreatorCanSetPlayerControllerError, OnlyLobbyCreatorCanStartGameError, PlayerAlreadyBotControlledError, PlayerAlreadyHumanControlledError, PlayerNotInGameError, ReviveNotAllowedInGameError, RoomAlreadyHasPlayerError, RoomIdAlreadyExistsError, RoomIsFullError, SpeedRoundTimerExpiredError, StateChangedSinceValidationError, TargetPlayerIsSelfError, TargetPlayerNotAllowedForActionError, TargetPlayerRequiredForActionError, UnableToFindPlayerError, UnableToForfeitError, YouAreDeadError } from "../utilities/errors"
+import { ActionNotChallengeableError, ActionNotCurrentlyAllowedError, BlockMayNotBeBlockedError, ClaimedInfluenceAlreadyConfirmedError, ClaimedInfluenceInvalidError, ClaimedInfluenceRequiredError, ConnectedSpectatorRequiredError, DifferentPlayerNameError, GameInProgressError, GameNeedsAtLeast2PlayersToStartError, GameNotInProgressError, GameOverError, InsufficientCoinsError, InvalidActionAt10CoinsError, MessageDoesNotExistError, MessageIsNotYoursError, MissingInfluenceError, NoDeadInfluencesError, OnlyLobbyCreatorCanSetGameSettingsError, OnlyLobbyCreatorCanSetPlayerControllerError, OnlyLobbyCreatorCanStartGameError, PlayerAlreadyBotControlledError, PlayerAlreadyHumanControlledError, PlayerNotInGameError, ReviveNotAllowedInGameError, RoomAlreadyHasPlayerError, RoomIdAlreadyExistsError, RoomIsFullError, SpeedRoundTimerExpiredError, StateChangedSinceValidationError, TargetPlayerIsSelfError, TargetPlayerNotAllowedForActionError, TargetPlayerRequiredForActionError, UnableToFindPlayerError, UnableToForfeitError, YouAreDeadError } from "../utilities/errors"
 import { ActionAttributes, Actions, AiPersonality, Allegiances, EmbezzleChallengeResponses, EventMessages, ExamineResponses, GameSettings, GameState, Influences, PlayerActions, PlayerControllers, Responses } from "../../../shared/types/game"
 import { getConnectedLobbyCreatorPresence, getGameState, getPublicGameState, logEvent, logForcedMove, mutateGameState } from "../utilities/gameState"
 import { generateRoomId } from "../utilities/identifiers"
@@ -12,6 +12,7 @@ import { MAX_PLAYER_COUNT } from '../../../shared/helpers/playerCount'
 import { AvailableLanguageCode } from '../../../shared/i18n/availableLanguages'
 import { recordBluff, recordChallengeMade, recordCoup, recordInfluenceKill, recordInfluenceClaim, recordSuccessfulBluff, recordSuccessfulChallenge } from './statsAccumulator'
 import { getViewerIdForSpectator, removeRoomPresence, upsertRoomPresence } from '../utilities/roomPresence'
+import { createDeckForPlayerCount } from '../utilities/deck'
 
 
 const getNormalizedSettings = (settings: GameSettings): GameSettings => ({
@@ -498,6 +499,52 @@ export const startGameHandler = async ({ roomId, playerId }: {
   }
 
   await mutateGameState(gameState, startGame)
+
+  return { roomId, playerId }
+}
+
+export const setGameSettingsHandler = async ({ roomId, playerId, settings }: {
+  roomId: string
+  playerId: string
+  settings: GameSettings
+}) => {
+  const gameState = await getGameState(roomId)
+  const player = gameState.players.find(({ id }) => id === playerId)
+  const lobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState })
+
+  if (gameState.isStarted) {
+    throw new GameInProgressError()
+  }
+
+  if (lobbyCreatorPresence && gameState.creatorPlayerId !== playerId) {
+    throw new OnlyLobbyCreatorCanSetGameSettingsError()
+  }
+
+  if (!lobbyCreatorPresence && !player) {
+    throw new PlayerNotInGameError()
+  }
+
+  await mutateGameState(gameState, (state) => {
+    const currentLobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState: state })
+
+    if (state.isStarted) {
+      throw new GameInProgressError()
+    }
+
+    if (currentLobbyCreatorPresence && state.creatorPlayerId !== playerId) {
+      throw new OnlyLobbyCreatorCanSetGameSettingsError()
+    }
+
+    if (!currentLobbyCreatorPresence && !state.players.find(({ id }) => id === playerId)) {
+      throw new PlayerNotInGameError()
+    }
+
+    state.settings = getNormalizedSettings({
+      ...state.settings,
+      ...settings,
+    })
+    state.deck = createDeckForPlayerCount(state.players.length, state.settings)
+  })
 
   return { roomId, playerId }
 }
@@ -1552,6 +1599,14 @@ export const resolveExamineHandler = async ({ roomId, playerId, response, isForc
     if (response === ExamineResponses.ForceExchange) {
       forceExchangeExaminedInfluence(state, state.pendingExamine.targetPlayer, state.pendingExamine.chosenInfluence)
     }
+
+    logEvent(state, {
+      event: response === ExamineResponses.ForceExchange
+        ? EventMessages.ExamineForcedExchange
+        : EventMessages.ExamineReturned,
+      primaryPlayer: state.pendingExamine.sourcePlayer,
+      secondaryPlayer: state.pendingExamine.targetPlayer
+    })
 
     delete state.pendingExamine
     moveTurnToNextPlayer(state)

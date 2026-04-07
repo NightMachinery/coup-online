@@ -229,6 +229,15 @@ const translations = {
     'it-IT': 'Solo il creatore della lobby può avviare la partita',
     'pt-BR': 'Somente o criador da sala pode iniciar o jogo',
   },
+  onlyLobbyCreatorCanSetGameSettings: {
+    'de-DE': 'Nur der Ersteller der Lobby kann die Einstellungen ändern',
+    'en-US': 'Only the lobby creator can change settings',
+    'es-MX': 'Solo el creador de la sala puede cambiar la configuración',
+    'fr-FR': 'Seul le créateur du salon peut modifier les paramètres',
+    'hi-IN': 'केवल लॉबी बनाने वाला ही सेटिंग्स बदल सकता है',
+    'it-IT': 'Solo il creatore della lobby può cambiare le impostazioni',
+    'pt-BR': 'Somente o criador da sala pode alterar as configurações',
+  },
   onlyLobbyCreatorCanSetPlayerController: {
     'de-DE': 'Nur der Ersteller der Lobby kann Spieler zwischen Bot und Mensch umschalten',
     'en-US': 'Only the lobby creator can switch players between bot and human',

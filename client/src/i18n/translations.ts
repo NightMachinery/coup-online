@@ -81,6 +81,8 @@ export type Translations = ActionMessages &
     [EventMessages.ActionConfirm]: ActionMessages
     [EventMessages.ActionPending]: Partial<ActionMessages>
     [EventMessages.ActionProcessed]: ActionMessages
+    [EventMessages.ExamineReturned]: TranslationsForString
+    [EventMessages.ExamineForcedExchange]: TranslationsForString
     [EventMessages.ForcedMoveProcessed]: TranslationsForString
     [EventMessages.BlockFailed]: TranslationsForString
     [EventMessages.BlockPending]: TranslationsForString
@@ -1102,6 +1104,8 @@ const translations: Translations = {
     [Actions.Embezzle]: untranslated('{{primaryPlayer}} {{action[[Embezzled]]}}'),
     [Actions.Examine]: untranslated('{{primaryPlayer}} {{action[[Examined]]}} {{secondaryPlayer}}'),
   },
+  [EventMessages.ExamineReturned]: untranslated('{{primaryPlayer}} returned {{secondaryPlayer}}\'s card'),
+  [EventMessages.ExamineForcedExchange]: untranslated('{{primaryPlayer}} forced {{secondaryPlayer}} to exchange'),
   [EventMessages.BlockFailed]: {
     'de-DE': '{{primaryPlayer}} konnte {{secondaryPlayer}} nicht blocken',
     'en-US': '{{primaryPlayer}} failed to block {{secondaryPlayer}}',

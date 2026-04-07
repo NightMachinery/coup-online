@@ -10,7 +10,8 @@ import {
   Responses,
   ServerEvents,
 } from '../shared/types/game'
-import { DehydratedPublicGameStateOrError } from './index'
+import './index'
+import type { DehydratedPublicGameStateOrError } from './index'
 import { MAX_PLAYER_COUNT } from '../shared/helpers/playerCount'
 import { AvailableLanguageCode } from '../shared/i18n/availableLanguages'
 
@@ -1018,12 +1019,14 @@ describe('index', () => {
         },
         {
           getBody: async () => {
-            const playerId = chance.string({ length: 10 })
-            const playerName = chance.string({ length: 10 })
+            const creatorId = chance.string({ length: 10 })
+            const creatorName = chance.string({ length: 10 })
+            const otherPlayerId = chance.string({ length: 10 })
+            const otherPlayerName = chance.string({ length: 10 })
 
             const response = await postApi(PlayerActions.createGame, {
-              playerId,
-              playerName,
+              playerId: creatorId,
+              playerName: creatorName,
               settings: { eventLogRetentionTurns: 100, allowRevive: true },
             })
 
@@ -1034,11 +1037,11 @@ describe('index', () => {
 
             await postApi(PlayerActions.joinGame, {
               roomId,
-              playerId: chance.string({ length: 10 }),
-              playerName: chance.string({ length: 10 }),
+              playerId: otherPlayerId,
+              playerName: otherPlayerName,
             })
 
-            return { roomId, playerId: chance.string({ length: 10 }) }
+            return { roomId, playerId: otherPlayerId }
           },
           error: 'Only the lobby creator can start the game',
           status: 400,
@@ -1117,6 +1120,133 @@ describe('index', () => {
           }
         },
       )
+    })
+
+    describe(PlayerActions.setGameSettings, () => {
+      it.each([
+        {
+          getBody: async () => {
+            const playerId = chance.string({ length: 10 })
+            const playerName = chance.string({ length: 10 })
+
+            const response = await postApi(PlayerActions.createGame, {
+              playerId,
+              playerName,
+              settings: { eventLogRetentionTurns: 100, allowRevive: true },
+            })
+
+            return {
+              roomId: response.json.gameState?.roomId,
+              playerId,
+              settings: {
+                eventLogRetentionTurns: 50,
+                allowRevive: false,
+                enableInquisitor: true,
+                allowContessaBlockExamine: true,
+                speedRoundSeconds: 15,
+              },
+            }
+          },
+          error: '',
+          status: 200,
+        },
+        {
+          getBody: () => ({}),
+          error: 'Invalid user request',
+          status: 400,
+        },
+        {
+          getBody: () => ({
+            roomId: chance.string({ length: 10 }),
+            playerId: chance.string({ length: 10 }),
+            settings: { eventLogRetentionTurns: 50, allowRevive: true },
+          }),
+          error: 'Room not found',
+          status: 404,
+        },
+        {
+          getBody: async () => {
+            const creatorId = chance.string({ length: 10 })
+            const response = await postApi(PlayerActions.createGame, {
+              playerId: creatorId,
+              playerName: chance.string({ length: 10 }),
+              settings: { eventLogRetentionTurns: 100, allowRevive: true },
+            })
+
+            const roomId = response.json.gameState?.roomId
+            await postApi(PlayerActions.joinGame, {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              playerName: chance.string({ length: 10 }),
+            })
+
+            return {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              settings: { eventLogRetentionTurns: 50, allowRevive: true },
+            }
+          },
+          error: 'Only the lobby creator can change settings',
+          status: 400,
+        },
+        {
+          getBody: async () => {
+            const creatorId = chance.string({ length: 10 })
+            const creatorName = chance.string({ length: 10 })
+            const response = await postApi(PlayerActions.createGame, {
+              playerId: creatorId,
+              playerName: creatorName,
+              settings: { eventLogRetentionTurns: 100, allowRevive: true },
+            })
+
+            const roomId = response.json.gameState?.roomId
+
+            await postApi(PlayerActions.joinGame, {
+              roomId,
+              playerId: chance.string({ length: 10 }),
+              playerName: chance.string({ length: 10 }),
+            })
+            await postApi(PlayerActions.startGame, {
+              roomId,
+              playerId: creatorId,
+            })
+
+            return {
+              roomId,
+              playerId: creatorId,
+              settings: { eventLogRetentionTurns: 50, allowRevive: true },
+            }
+          },
+          error: 'Game is in progress',
+          status: 400,
+        },
+      ] as {
+        getBody: () => Promise<Partial<{ roomId: string; playerId: string; settings: object }>> | Partial<{ roomId: string; playerId: string; settings: object }>
+        error: string
+        status: number
+      }[])('should return $status $error', async ({ getBody, error, status }) => {
+        const response = await postApi(
+          PlayerActions.setGameSettings,
+          await getBody(),
+        )
+
+        expect(response.status).toBe(status)
+        if (error) {
+          expect(response.json).toEqual({
+            error: expect.stringMatching(error),
+          })
+        } else {
+          validatePublicState(response.json.gameState!)
+          expect(response.json.gameState?.settings).toEqual({
+            eventLogRetentionTurns: 50,
+            allowRevive: false,
+            enableReformation: false,
+            enableInquisitor: true,
+            allowContessaBlockExamine: true,
+            speedRoundSeconds: 15,
+          })
+        }
+      })
     })
   })
 

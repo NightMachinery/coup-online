@@ -296,6 +296,18 @@ export class OnlyLobbyCreatorCanStartGameError extends GameMutationInputError {
   }
 }
 
+export class OnlyLobbyCreatorCanSetGameSettingsError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'onlyLobbyCreatorCanSetGameSettings',
+      language
+    })
+  }
+}
+
 export class OnlyLobbyCreatorCanSetPlayerControllerError extends GameMutationInputError {
   getMessage: (language: AvailableLanguageCode) => string
 

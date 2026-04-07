@@ -3,8 +3,6 @@ import {
   Box,
   Button,
   Grid,
-  Slider,
-  Switch,
   TextField,
 } from '@mui/material'
 import { AddCircle, Person } from '@mui/icons-material'
@@ -30,6 +28,8 @@ import {
 import CoupTypography from '../utilities/CoupTypography'
 import { usePersistedState } from '../../hooks/usePersistedState'
 import { useDisplayName } from '../../hooks/useDisplayName'
+import GameSettingsFields from '../game/GameSettingsFields'
+import { EditableGameSettings, normalizeEditableGameSettings } from '../../helpers/gameSettings'
 
 function CreateGame() {
   const [playerName, setPlayerName] = useState('')
@@ -79,6 +79,26 @@ function CreateGame() {
     }
   }, [isLocalAuth, playerName, profileName])
 
+  const editableSettings: EditableGameSettings = {
+    eventLogRetentionTurns,
+    allowRevive,
+    speedRoundEnabled,
+    speedRoundSeconds,
+    enableReformation,
+    enableInquisitor,
+    allowContessaBlockExamine,
+  }
+
+  const setEditableSettings = (settings: EditableGameSettings) => {
+    setEventLogRetentionTurns(settings.eventLogRetentionTurns)
+    setAllowRevive(settings.allowRevive)
+    setSpeedRoundEnabled(settings.speedRoundEnabled)
+    setSpeedRoundSeconds(settings.speedRoundSeconds)
+    setEnableReformation(settings.enableReformation)
+    setEnableInquisitor(settings.enableInquisitor)
+    setAllowContessaBlockExamine(settings.allowContessaBlockExamine)
+  }
+
   return (
     <>
       <CoupTypography variant="h5" sx={{ m: 5 }} addTextShadow>
@@ -105,14 +125,7 @@ function CreateGame() {
           trigger({
             playerId: getPlayerId(),
             playerName: submittedPlayerName,
-            settings: {
-              eventLogRetentionTurns,
-              allowRevive,
-              enableReformation,
-              enableInquisitor,
-              allowContessaBlockExamine: enableInquisitor && allowContessaBlockExamine,
-              ...(speedRoundEnabled && { speedRoundSeconds }),
-            },
+            settings: normalizeEditableGameSettings(editableSettings),
             ...(user && { uid: user.uid }),
             ...(user?.photoURL && { photoURL: user.photoURL }),
           })
@@ -142,122 +155,12 @@ function CreateGame() {
               />
             </Box>
           </Grid>
-          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-            <Box mt={6}>
-              <CoupTypography mt={2} addTextShadow>
-                {t('eventLogRetentionTurns')}
-                {`: ${eventLogRetentionTurns}`}
-              </CoupTypography>
-              <Slider
-                data-testid="eventLogRetentionTurnsInput"
-                step={1}
-                value={eventLogRetentionTurns}
-                valueLabelDisplay="auto"
-                min={1}
-                max={100}
-                onChange={(_: Event, value: number) => {
-                  setEventLogRetentionTurns(value)
-                }}
-              />
-            </Box>
-          </Grid>
-          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-            <Box mt={2}>
-              <CoupTypography component="span" mt={2} addTextShadow>
-                {t('allowRevive')}:
-              </CoupTypography>
-              <Switch
-                checked={allowRevive}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                  setAllowRevive(event.target.checked)
-                }}
-                slotProps={{ input: { 'aria-label': 'controlled' } }}
-              />
-            </Box>
-          </Grid>
-          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-            <Box mt={2}>
-              <CoupTypography component="span" mt={2} addTextShadow>
-                {t('speedRound')}:
-              </CoupTypography>
-              <Switch
-                checked={speedRoundEnabled}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                  setSpeedRoundEnabled(event.target.checked)
-                }}
-                slotProps={{ input: { 'aria-label': 'controlled' } }}
-              />
-            </Box>
-          </Grid>
-          {speedRoundEnabled && (
-            <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-              <Box mt={2}>
-                <CoupTypography mt={2} addTextShadow>
-                  {t('speedRoundSeconds')}
-                  {`: ${speedRoundSeconds}`}
-                </CoupTypography>
-                <Slider
-                  data-testid="speedRoundSecondsInput"
-                  step={1}
-                  value={speedRoundSeconds}
-                  valueLabelDisplay="auto"
-                  min={5}
-                  max={60}
-                  onChange={(_: Event, value: number) => {
-                    setSpeedRoundSeconds(value)
-                  }}
-                />
-              </Box>
-            </Grid>
-          )}
-          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-            <Box mt={2}>
-              <CoupTypography component="span" mt={2} addTextShadow>
-                {t('enableReformation')}:
-              </CoupTypography>
-              <Switch
-                checked={enableReformation}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                  setEnableReformation(event.target.checked)
-                }}
-                slotProps={{ input: { 'aria-label': 'controlled' } }}
-              />
-            </Box>
-          </Grid>
-          <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-            <Box mt={2}>
-              <CoupTypography component="span" mt={2} addTextShadow>
-                {t('enableInquisitor')}:
-              </CoupTypography>
-              <Switch
-                checked={enableInquisitor}
-                onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                  const enabled = event.target.checked
-                  setEnableInquisitor(enabled)
-                  if (!enabled) {
-                    setAllowContessaBlockExamine(false)
-                  }
-                }}
-                slotProps={{ input: { 'aria-label': 'controlled' } }}
-              />
-            </Box>
-          </Grid>
-          {enableInquisitor && (
-            <Grid sx={{ maxWidth: '300px', width: '90%' }}>
-              <Box mt={2}>
-                <CoupTypography component="span" mt={2} addTextShadow>
-                  {t('allowContessaBlockExamine')}:
-                </CoupTypography>
-                <Switch
-                  checked={allowContessaBlockExamine}
-                  onChange={(event: React.ChangeEvent<HTMLInputElement>) => {
-                    setAllowContessaBlockExamine(event.target.checked)
-                  }}
-                  slotProps={{ input: { 'aria-label': 'controlled' } }}
-                />
-              </Box>
-            </Grid>
-          )}
+          <GameSettingsFields
+            settings={editableSettings}
+            onChange={(settings) => {
+              setEditableSettings(settings)
+            }}
+          />
         </Grid>
         <Grid>
           <Button

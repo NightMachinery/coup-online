@@ -1,6 +1,6 @@
 import { vi, type MockInstance, describe, it, expect, afterEach } from 'vitest'
 import Chance from 'chance'
-import { Actions, EventMessages, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
+import { Actions, EventMessages, ExamineResponses, GameSettings, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
 import {
   actionChallengeResponseHandler,
   actionHandler,
@@ -8,13 +8,16 @@ import {
   addAiPlayerHandler,
   blockChallengeResponseHandler,
   blockResponseHandler,
+  chooseExamineInfluenceHandler,
   createGameHandler,
   joinGameHandler,
   loseInfluencesHandler,
   removeFromGameHandler,
+  resolveExamineHandler,
   resetGameHandler,
   resetGameRequestCancelHandler,
   resetGameRequestHandler,
+  setGameSettingsHandler,
   setPlayerControllerHandler,
   startGameHandler,
 } from './actionHandlers'
@@ -34,6 +37,7 @@ import {
   InsufficientCoinsError,
   InvalidActionAt10CoinsError,
   MissingInfluenceError,
+  OnlyLobbyCreatorCanSetGameSettingsError,
   OnlyLobbyCreatorCanSetPlayerControllerError,
   OnlyLobbyCreatorCanStartGameError,
   PlayerAlreadyBotControlledError,
@@ -88,6 +92,11 @@ describe('actionHandlers', () => {
       playerId: chance.string({ length: 10 }),
     }))
 
+    const defaultGameSettings: GameSettings = {
+      eventLogRetentionTurns: 100,
+      allowRevive: true,
+    }
+
     const setupTestGame = async (
       players: {
         playerId: string;
@@ -96,10 +105,11 @@ describe('actionHandlers', () => {
         influences?: Influences[];
         deadInfluences?: Influences[];
       }[],
+      settings: GameSettings = defaultGameSettings,
     ) => {
       const { roomId } = await createGameHandler({
         ...players[0],
-        settings: { eventLogRetentionTurns: 100, allowRevive: true },
+        settings,
       })
 
       for (const player of players) {
@@ -323,6 +333,70 @@ describe('actionHandlers', () => {
       })
 
       await startGameHandler({ roomId, playerId: hailey.playerId })
+    })
+
+    it('should allow lobby settings to be updated before the game starts', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+
+      await setGameSettingsHandler({
+        roomId,
+        playerId: harper.playerId,
+        settings: {
+          ...defaultGameSettings,
+          enableInquisitor: true,
+          allowContessaBlockExamine: true,
+          speedRoundSeconds: 20,
+        },
+      })
+
+      const gameState = await getGameState(roomId)
+      expect(gameState.settings).toEqual({
+        ...defaultGameSettings,
+        enableReformation: false,
+        enableInquisitor: true,
+        allowContessaBlockExamine: true,
+        speedRoundSeconds: 20,
+      })
+      expect(gameState.deck).toContain(Influences.Inquisitor)
+      expect(gameState.deck).not.toContain(Influences.Ambassador)
+    })
+
+    it('should restrict lobby settings edits to the connected creator when present', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+
+      await expect(
+        setGameSettingsHandler({
+          roomId,
+          playerId: hailey.playerId,
+          settings: {
+            ...defaultGameSettings,
+            enableReformation: true,
+          },
+        }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanSetGameSettingsError)
+
+      clearRoomPresence()
+
+      await expect(
+        setGameSettingsHandler({
+          roomId,
+          playerId: hailey.playerId,
+          settings: {
+            ...defaultGameSettings,
+            enableReformation: true,
+          },
+        }),
+      ).resolves.toEqual({ roomId, playerId: hailey.playerId })
     })
 
     it('should let the creator switch a human player to bot control mid-game', async () => {
@@ -965,6 +1039,116 @@ describe('actionHandlers', () => {
       expect(gameState.players[0].coins).toBe(2)
       expect(gameState.players[1].coins).toBe(2)
       expect(gameState.players[2].coins).toBe(2)
+    })
+
+    it('examine -> return logs the outcome without revealing the card', async () => {
+      const roomId = await setupTestGame([
+        { ...harper, influences: [Influences.Inquisitor, Influences.Duke] },
+        { ...hailey, influences: [Influences.Captain, Influences.Contessa] },
+        david,
+      ], {
+        ...defaultGameSettings,
+        enableInquisitor: true,
+      })
+
+      await actionHandler({
+        roomId,
+        playerId: harper.playerId,
+        action: Actions.Examine,
+        targetPlayer: hailey.playerName,
+      })
+      await actionResponseHandler({
+        roomId,
+        playerId: hailey.playerId,
+        response: Responses.Pass,
+      })
+      await actionResponseHandler({
+        roomId,
+        playerId: david.playerId,
+        response: Responses.Pass,
+      })
+      await chooseExamineInfluenceHandler({
+        roomId,
+        playerId: hailey.playerId,
+        influence: Influences.Captain,
+      })
+      await resolveExamineHandler({
+        roomId,
+        playerId: harper.playerId,
+        response: ExamineResponses.Return,
+      })
+
+      const gameState = await getGameState(roomId)
+
+      expect(gameState.eventLogs.slice(-2)).toEqual([
+        expect.objectContaining({
+          event: EventMessages.ActionProcessed,
+          action: Actions.Examine,
+          primaryPlayer: harper.playerName,
+          secondaryPlayer: hailey.playerName,
+        }),
+        expect.objectContaining({
+          event: EventMessages.ExamineReturned,
+          primaryPlayer: harper.playerName,
+          secondaryPlayer: hailey.playerName,
+        }),
+      ])
+      expect(gameState.eventLogs.at(-1)?.influence).toBeUndefined()
+    })
+
+    it('examine -> force exchange logs the outcome without revealing the card', async () => {
+      const roomId = await setupTestGame([
+        { ...harper, influences: [Influences.Inquisitor, Influences.Duke] },
+        { ...hailey, influences: [Influences.Captain, Influences.Contessa] },
+        david,
+      ], {
+        ...defaultGameSettings,
+        enableInquisitor: true,
+      })
+
+      await actionHandler({
+        roomId,
+        playerId: harper.playerId,
+        action: Actions.Examine,
+        targetPlayer: hailey.playerName,
+      })
+      await actionResponseHandler({
+        roomId,
+        playerId: hailey.playerId,
+        response: Responses.Pass,
+      })
+      await actionResponseHandler({
+        roomId,
+        playerId: david.playerId,
+        response: Responses.Pass,
+      })
+      await chooseExamineInfluenceHandler({
+        roomId,
+        playerId: hailey.playerId,
+        influence: Influences.Captain,
+      })
+      await resolveExamineHandler({
+        roomId,
+        playerId: harper.playerId,
+        response: ExamineResponses.ForceExchange,
+      })
+
+      const gameState = await getGameState(roomId)
+
+      expect(gameState.eventLogs.slice(-2)).toEqual([
+        expect.objectContaining({
+          event: EventMessages.ActionProcessed,
+          action: Actions.Examine,
+          primaryPlayer: harper.playerName,
+          secondaryPlayer: hailey.playerName,
+        }),
+        expect.objectContaining({
+          event: EventMessages.ExamineForcedExchange,
+          primaryPlayer: harper.playerName,
+          secondaryPlayer: hailey.playerName,
+        }),
+      ])
+      expect(gameState.eventLogs.at(-1)?.influence).toBeUndefined()
     })
 
     it('coup', async () => {
