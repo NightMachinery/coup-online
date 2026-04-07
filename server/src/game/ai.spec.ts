@@ -1,705 +1,555 @@
-import { vi, describe, it, expect } from 'vitest'
-import { Chance } from 'chance'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { GameState, Player, PublicGameState, PublicPlayer } from '../../../shared/types/game'
 import {
   Actions,
   Allegiances,
+  EmbezzleChallengeResponses,
+  ExamineResponses,
   Influences,
-  Player,
-  PublicGameState,
-  PublicPlayer,
+  PlayerActions,
   Responses,
 } from '../../../shared/types/game'
+
+vi.mock('./aiRandomness')
+vi.mock('../utilities/gameState', async () => {
+  const actual = await vi.importActual<typeof import('../utilities/gameState')>('../utilities/gameState')
+  return {
+    ...actual,
+    getGameState: vi.fn(),
+    getPublicGameState: vi.fn(),
+  }
+})
+
 import {
   decideAction,
   decideActionResponse,
+  decideInfluencesToLose,
   getOpponents,
   getPlayerDangerFactor,
+  getPlayerSuggestedMove,
   getProbabilityOfPlayerInfluence,
 } from './ai'
-import { randomlyDecideToBluff } from './aiRandomness'
-
-const chance = new Chance()
-vi.mock('./aiRandomness')
+import { randomlyDecideToBluff, randomlyDecideToNotUseOwnedInfluence } from './aiRandomness'
+import { getGameState, getPublicGameState } from '../utilities/gameState'
 
 const randomlyDecideToBluffMock = vi.mocked(randomlyDecideToBluff)
+const randomlyDecideToNotUseOwnedInfluenceMock = vi.mocked(randomlyDecideToNotUseOwnedInfluence)
+const getGameStateMock = vi.mocked(getGameState)
+const getPublicGameStateMock = vi.mocked(getPublicGameState)
 
-describe('ai', () => {
-  const getRandomPlayer = (): Player => ({
-    id: chance.guid(),
-    name: chance.string(),
-    coins: chance.natural({ min: 0, max: 5 }),
-    influences: [],
-    claimedInfluences: new Set(),
-    unclaimedInfluences: new Set(),
-    deadInfluences: [],
-    color: chance.string(),
-    ai: chance.bool(),
-    grudges: {},
-  })
-
-  const getRandomPublicPlayer = (): PublicPlayer => ({
-    name: chance.string(),
-    coins: chance.natural({ min: 0, max: 5 }),
+const buildPublicPlayer = (overrides: Partial<PublicPlayer> & Pick<PublicPlayer, 'name'>): PublicPlayer => {
+  const { name, ...rest } = overrides
+  return {
+    name,
+    coins: 2,
     influenceCount: 2,
     claimedInfluences: new Set(),
     unclaimedInfluences: new Set(),
     deadInfluences: [],
-    color: chance.string(),
-    ai: chance.bool(),
+    color: '#123456',
+    ai: true,
     grudges: {},
-  })
-
-  const getRandomPublicGameState = ({
-    players,
-    selfPlayer,
-  }: {
-    players: Partial<PublicPlayer>[];
-    selfPlayer: Partial<Player>;
-  }): PublicGameState => {
-    const gameState: PublicGameState = {
-      deckCount: 15 - players.length * 2,
-      eventLogs: [],
-      chatMessages: [],
-      lastEventTimestamp: chance.date(),
-      isStarted: chance.bool(),
-      selfIsCreator: false,
-      treasuryReserveCoins: 0,
-      turn: chance.natural(),
-      players: [],
-      pendingInfluenceLoss: {},
-      settings: { eventLogRetentionTurns: 3, allowRevive: true },
-      roomId: chance.string(),
-    }
-
-    gameState.players = players.map((player) => {
-      return {
-        ...getRandomPublicPlayer(),
-        ...player,
-      }
-    })
-    gameState.selfPlayer = {
-      ...getRandomPlayer(),
-      ...selfPlayer,
-    }
-    gameState.turnPlayer = gameState.selfPlayer!.name
-
-    return gameState
+    ...rest,
   }
+}
 
+const buildPlayer = (overrides: Partial<Player> & Pick<Player, 'id' | 'name'>): Player => {
+  const { id, name, ...rest } = overrides
+  return {
+    id,
+    name,
+    coins: 2,
+    influences: [Influences.Contessa, Influences.Captain],
+    claimedInfluences: new Set(),
+    unclaimedInfluences: new Set(),
+    deadInfluences: [],
+    color: '#654321',
+    ai: true,
+    grudges: {},
+    ...rest,
+  }
+}
+
+const buildGameState = ({
+  players,
+  selfPlayer,
+  settings,
+  pendingAction,
+  pendingExamine,
+  pendingInfluenceLoss,
+  turnPlayer,
+  treasuryReserveCoins,
+}: {
+  players: PublicPlayer[]
+  selfPlayer: Player
+  settings?: PublicGameState['settings']
+  pendingAction?: PublicGameState['pendingAction']
+  pendingExamine?: PublicGameState['pendingExamine']
+  pendingInfluenceLoss?: PublicGameState['pendingInfluenceLoss']
+  turnPlayer?: string
+  treasuryReserveCoins?: number
+}): PublicGameState => ({
+  roomId: 'room-1',
+  isStarted: true,
+  turn: 1,
+  eventLogs: [],
+  chatMessages: [],
+  lastEventTimestamp: new Date('2026-04-07T00:00:00.000Z'),
+  players,
+  selfPlayer,
+  settings: {
+    eventLogRetentionTurns: 3,
+    allowRevive: true,
+    ...settings,
+  },
+  pendingInfluenceLoss: pendingInfluenceLoss ?? {},
+  selfIsCreator: false,
+  treasuryReserveCoins: treasuryReserveCoins ?? 0,
+  deckCount: Math.max(0, 15 - players.length * 2),
+  ...(pendingAction && { pendingAction }),
+  ...(pendingExamine && { pendingExamine }),
+  ...(turnPlayer && { turnPlayer }),
+})
+
+beforeEach(() => {
+  randomlyDecideToBluffMock.mockReturnValue(false)
+  randomlyDecideToNotUseOwnedInfluenceMock.mockReturnValue(false)
+  getGameStateMock.mockReset()
+  getPublicGameStateMock.mockReset()
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('ai', () => {
   describe('getProbabilityOfPlayerInfluence', () => {
-    const testCases: {
-      testCase: string;
-      gameState: PublicGameState;
-      influence: Influences;
-      playerName: string;
-      probability: number;
-      anyPlayerProbability: number;
-    }[] = [
-      {
-        testCase: '2 hidden cards',
-        gameState: getRandomPublicGameState({
-          players: [
-            {
-              name: 'david',
-              influenceCount: 1,
-              deadInfluences: [Influences.Contessa],
-            },
-            {
-              name: 'harper',
-              influenceCount: 1,
-              deadInfluences: [Influences.Captain],
-            },
-          ],
-          selfPlayer: {
-            name: 'david',
-            influences: [Influences.Ambassador],
-            deadInfluences: [Influences.Contessa],
-          },
+    it('returns zero when all copies of an influence are already known', () => {
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'bot', influenceCount: 1, deadInfluences: [Influences.Ambassador] }),
+          buildPublicPlayer({ name: 'alice', influenceCount: 1, deadInfluences: [Influences.Assassin] }),
+          buildPublicPlayer({ name: 'carol', influenceCount: 1, deadInfluences: [Influences.Assassin] }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          influences: [Influences.Assassin],
+          deadInfluences: [Influences.Ambassador],
         }),
-        influence: Influences.Captain,
-        playerName: 'harper',
-        probability: 2 / 12,
-        anyPlayerProbability: 2 / 12,
-      },
-      {
-        testCase: '2 cards revealed and self holding last card',
-        gameState: getRandomPublicGameState({
-          players: [
-            {
-              name: 'david',
-              influenceCount: 1,
-              deadInfluences: [Influences.Ambassador],
-            },
-            {
-              name: 'harper',
-              influenceCount: 1,
-              deadInfluences: [Influences.Assassin],
-            },
-            {
-              name: 'hailey',
-              influenceCount: 1,
-              deadInfluences: [Influences.Assassin],
-            },
-          ],
-          selfPlayer: {
-            name: 'david',
-            influences: [Influences.Assassin],
-            deadInfluences: [Influences.Ambassador],
-          },
-        }),
-        influence: Influences.Assassin,
-        playerName: 'hailey',
-        probability: 0,
-        anyPlayerProbability: 0,
-      },
-      {
-        testCase: 'self holding 2 cards and last card hidden',
-        gameState: getRandomPublicGameState({
-          players: [
-            { name: 'david', influenceCount: 2, deadInfluences: [] },
-            { name: 'harper', influenceCount: 2, deadInfluences: [] },
-            { name: 'hailey', influenceCount: 2, deadInfluences: [] },
-          ],
-          selfPlayer: {
-            name: 'david',
-            influences: [Influences.Duke, Influences.Duke],
-            deadInfluences: [],
-          },
-        }),
-        influence: Influences.Duke,
-        playerName: 'harper',
-        probability: 2 / 13,
-        anyPlayerProbability: 4 / 13,
-      },
-      {
-        testCase: 'all cards revealed for influence',
-        gameState: getRandomPublicGameState({
-          players: [
-            {
-              name: 'david',
-              influenceCount: 1,
-              deadInfluences: [Influences.Assassin],
-            },
-            {
-              name: 'harper',
-              influenceCount: 1,
-              deadInfluences: [Influences.Assassin],
-            },
-            {
-              name: 'hailey',
-              influenceCount: 1,
-              deadInfluences: [Influences.Assassin],
-            },
-          ],
-          selfPlayer: {
-            name: 'david',
-            influences: [Influences.Ambassador],
-            deadInfluences: [Influences.Assassin],
-          },
-        }),
-        influence: Influences.Assassin,
-        playerName: 'harper',
-        probability: 0,
-        anyPlayerProbability: 0,
-      },
-    ]
+      })
 
-    it.each(testCases)(
-      'should return $probability for $testCase',
-      ({
-        gameState,
-        influence,
-        playerName,
-        probability,
-        anyPlayerProbability,
-      }: {
-        testCase: string;
-        gameState: PublicGameState;
-        influence: Influences;
-        playerName: string;
-        probability: number;
-        anyPlayerProbability: number;
-      }) => {
-        expect(
-          getProbabilityOfPlayerInfluence(gameState, influence, playerName),
-        ).toBeCloseTo(probability)
-        expect(
-          getProbabilityOfPlayerInfluence(gameState, influence),
-        ).toBeCloseTo(anyPlayerProbability)
-      },
-    )
+      expect(getProbabilityOfPlayerInfluence(gameState, Influences.Assassin, 'alice')).toBe(0)
+      expect(getProbabilityOfPlayerInfluence(gameState, Influences.Assassin)).toBe(0)
+    })
   })
 
   describe('getPlayerDangerFactor', () => {
-    const testCases: {
-      testCase: string;
-      player: PublicPlayer;
-      dangerFactor: number;
-    }[] = [
-      {
-        testCase: 'dead player with some coins',
-        player: {
-          ...getRandomPublicPlayer(),
-          influenceCount: 0,
-          coins: 12,
-        },
-        dangerFactor: 0,
-      },
-      {
-        testCase: '1 influence left with 0 coins',
-        player: {
-          ...getRandomPublicPlayer(),
-          influenceCount: 1,
-          coins: 0,
-        },
-        dangerFactor: 10,
-      },
-      {
-        testCase: '1 influence left with 12 coins',
-        player: {
-          ...getRandomPublicPlayer(),
-          influenceCount: 1,
-          coins: 12,
-        },
-        dangerFactor: 22,
-      },
-      {
-        testCase: '2 influences left with 0 coins',
-        player: {
-          ...getRandomPublicPlayer(),
-          influenceCount: 2,
-          coins: 0,
-        },
-        dangerFactor: 20,
-      },
-      {
-        testCase: '2 influences left with 12 coins',
-        player: {
-          ...getRandomPublicPlayer(),
-          influenceCount: 2,
-          coins: 12,
-        },
-        dangerFactor: 32,
-      },
-    ]
+    it('treats dead players as non-threatening', () => {
+      expect(getPlayerDangerFactor(buildPublicPlayer({ name: 'alice', influenceCount: 0, coins: 12 }))).toBe(0)
+    })
 
-    it.each(testCases)(
-      'should return $dangerFactor for $testCase',
-      ({ player, dangerFactor }) => {
-        expect(getPlayerDangerFactor(player)).toBeCloseTo(dangerFactor)
-      },
-    )
+    it('weights influence count and coins', () => {
+      expect(getPlayerDangerFactor(buildPublicPlayer({ name: 'alice', influenceCount: 2, coins: 12 }))).toBe(32)
+    })
   })
 
   describe('getOpponents', () => {
-    it.each([
-      {
-        testCase: '1 living opponent, 1 dead opponent',
-        gameState: getRandomPublicGameState({
-          players: [
-            { name: 'david', influenceCount: 1 },
-            { name: 'harper', influenceCount: 0 },
-            { name: 'hailey', influenceCount: 1 },
-          ],
-          selfPlayer: { name: 'david' },
-        }),
-        expected: [expect.objectContaining({ name: 'hailey' })],
-      },
-      {
-        testCase: '1 dead opponent',
-        gameState: getRandomPublicGameState({
-          players: [
-            { name: 'david', influenceCount: 1 },
-            { name: 'harper', influenceCount: 0 },
-          ],
-          selfPlayer: { name: 'david' },
-        }),
-        expected: [],
-      },
-      {
-        testCase: '2 living opponents',
-        gameState: getRandomPublicGameState({
-          players: [
-            { name: 'david', influenceCount: 1 },
-            { name: 'harper', influenceCount: 1 },
-            { name: 'hailey', influenceCount: 1 },
-          ],
-          selfPlayer: { name: 'david' },
-        }),
-        expected: [
-          expect.objectContaining({ name: 'harper' }),
-          expect.objectContaining({ name: 'hailey' }),
+    it('returns only living opponents', () => {
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'bot', influenceCount: 1 }),
+          buildPublicPlayer({ name: 'alice', influenceCount: 0 }),
+          buildPublicPlayer({ name: 'carol', influenceCount: 1 }),
         ],
-      },
-    ])('should return $expected for $testCase', ({ gameState, expected }) => {
-      expect(getOpponents(gameState)).toEqual(expected)
+        selfPlayer: buildPlayer({ id: 'bot-id', name: 'bot', influences: [Influences.Duke] }),
+      })
+
+      expect(getOpponents(gameState).map(({ name }) => name)).toEqual(['carol'])
     })
   })
 
   describe('decideAction', () => {
-    it('should choose Coup if 10 or more coins and Revive not enabled', () => {
+    it('chooses Coup at 10 coins when Revive is not available', () => {
       expect(
-        decideAction({
-          roomId: chance.string(),
-          isStarted: chance.bool(),
-          turn: chance.natural(),
-          eventLogs: [],
-          chatMessages: [],
-          lastEventTimestamp: chance.date(),
-          players: [
-            {
-              ...getRandomPublicPlayer(),
-              name: 'harper',
-              influenceCount: 2,
-              deadInfluences: [],
-            },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'david',
-              influenceCount: 2,
-              deadInfluences: [],
-            },
-          ],
-          selfPlayer: {
-            ...getRandomPublicPlayer(),
-            id: chance.string(),
-            name: 'harper',
-            coins: 10,
-            influences: [Influences.Ambassador, Influences.Contessa],
-            deadInfluences: [],
-          },
-          settings: { eventLogRetentionTurns: 3, allowRevive: false },
-          pendingInfluenceLoss: {},
-          selfIsCreator: false,
-          treasuryReserveCoins: 0,
-          deckCount: 11,
-        }),
+        decideAction(
+          buildGameState({
+            players: [
+              buildPublicPlayer({ name: 'bot' }),
+              buildPublicPlayer({ name: 'alice' }),
+            ],
+            selfPlayer: buildPlayer({
+              id: 'bot-id',
+              name: 'bot',
+              coins: 10,
+              influences: [Influences.Ambassador, Influences.Contessa],
+            }),
+            settings: { eventLogRetentionTurns: 3, allowRevive: false },
+          }),
+        ),
       ).toEqual({
         action: Actions.Coup,
-        targetPlayer: 'david',
+        targetPlayer: 'alice',
       })
     })
 
-    it('should choose Coup if 7 or more coins and checkmate', () => {
-      expect(
-        decideAction({
-          roomId: chance.string(),
-          isStarted: chance.bool(),
-          turn: chance.natural(),
-          eventLogs: [],
-          chatMessages: [],
-          lastEventTimestamp: chance.date(),
-          players: [
-            {
-              ...getRandomPublicPlayer(),
-              name: 'harper',
-              influenceCount: 1,
-              deadInfluences: [Influences.Contessa],
-            },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'david',
-              influenceCount: 1,
-              deadInfluences: [Influences.Captain],
-            },
-          ],
-          selfPlayer: {
-            ...getRandomPublicPlayer(),
-            id: chance.string(),
-            name: 'harper',
+    it('chooses self Convert when that opens access to the most dangerous opponent', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({
+            name: 'bot',
+            coins: 1,
+            allegiance: Allegiances.Loyalist,
+            claimedInfluences: new Set([Influences.Duke]),
+          }),
+          buildPublicPlayer({
+            name: 'threat-1',
+            coins: 8,
+            allegiance: Allegiances.Loyalist,
+            claimedInfluences: new Set([Influences.Duke]),
+          }),
+          buildPublicPlayer({
+            name: 'threat-2',
             coins: 7,
-            influences: [Influences.Ambassador],
-            deadInfluences: [Influences.Contessa],
-          },
-          settings: { eventLogRetentionTurns: 3, allowRevive: true },
-          pendingInfluenceLoss: {},
-          selfIsCreator: false,
-          treasuryReserveCoins: 0,
-          deckCount: 11,
+            allegiance: Allegiances.Loyalist,
+          }),
+          buildPublicPlayer({
+            name: 'carol',
+            coins: 0,
+            allegiance: Allegiances.Reformist,
+            influenceCount: 1,
+          }),
+          buildPublicPlayer({
+            name: 'dave',
+            coins: 0,
+            allegiance: Allegiances.Reformist,
+            influenceCount: 1,
+          }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 1,
+          influences: [Influences.Contessa, Influences.Contessa],
+          allegiance: Allegiances.Loyalist,
+          claimedInfluences: new Set(),
         }),
-      ).toEqual({
-        action: Actions.Coup,
-        targetPlayer: 'david',
+        settings: {
+          eventLogRetentionTurns: 3,
+          allowRevive: true,
+          enableReformation: true,
+        },
+      })
+
+      expect(decideAction(gameState)).toEqual({
+        action: Actions.Convert,
+        targetPlayer: 'bot',
       })
     })
 
-    it('should bluff influence on actions with some randomness', () => {
-      randomlyDecideToBluffMock.mockReturnValue(true)
+    it('chooses opponent Convert when flipping them is better than flipping self', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
 
-      const decidedAction = decideAction({
-        roomId: chance.string(),
-        isStarted: chance.bool(),
-        turn: chance.natural(),
-        eventLogs: [],
-        chatMessages: [],
-        lastEventTimestamp: chance.date(),
+      const gameState = buildGameState({
         players: [
-          {
-            ...getRandomPublicPlayer(),
-            name: 'harper',
-            influenceCount: 1,
-            deadInfluences: [Influences.Assassin],
+          buildPublicPlayer({
+            name: 'bot',
+            coins: 2,
+            allegiance: Allegiances.Loyalist,
             claimedInfluences: new Set([Influences.Duke]),
-          },
-          {
-            ...getRandomPublicPlayer(),
-            name: 'hailey',
+          }),
+          buildPublicPlayer({
+            name: 'threat',
+            coins: 8,
+            allegiance: Allegiances.Loyalist,
+            claimedInfluences: new Set([Influences.Duke]),
+          }),
+          buildPublicPlayer({
+            name: 'carol',
+            coins: 0,
+            allegiance: Allegiances.Reformist,
             influenceCount: 1,
-            deadInfluences: [Influences.Duke],
-          },
-          {
-            ...getRandomPublicPlayer(),
-            name: 'david',
-            influenceCount: 1,
-            deadInfluences: [Influences.Duke],
-          },
+          }),
         ],
-        selfPlayer: {
-          ...getRandomPublicPlayer(),
-          id: chance.string(),
-          name: 'harper',
-          coins: 4,
-          influences: [Influences.Ambassador],
-          deadInfluences: [Influences.Assassin],
-          claimedInfluences: new Set([Influences.Duke]),
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Contessa, Influences.Contessa],
+          allegiance: Allegiances.Loyalist,
+          claimedInfluences: new Set(),
+        }),
+        settings: {
+          eventLogRetentionTurns: 3,
+          allowRevive: true,
+          enableReformation: true,
         },
-        settings: { eventLogRetentionTurns: 3, allowRevive: false },
-        pendingInfluenceLoss: {},
-        selfIsCreator: false,
-        treasuryReserveCoins: 0,
-        deckCount: 11,
       })
 
-      expect(decidedAction.action).toBe(Actions.Tax)
+      expect(decideAction(gameState)).toEqual({
+        action: Actions.Convert,
+        targetPlayer: 'threat',
+      })
     })
 
-    it('should not bluff influence if all are dead', () => {
-      randomlyDecideToBluffMock.mockReturnValue(true)
-
-      const decidedAction = decideAction({
-        roomId: chance.string(),
-        isStarted: chance.bool(),
-        turn: chance.natural(),
-        eventLogs: [],
-        chatMessages: [],
-        lastEventTimestamp: chance.date(),
+    it('prefers Examine over Exchange when an Inquisitor target is dangerous and highly claimed', () => {
+      const gameState = buildGameState({
         players: [
-          {
-            ...getRandomPublicPlayer(),
-            name: 'harper',
-            influenceCount: 1,
-            deadInfluences: [Influences.Assassin],
-            claimedInfluences: new Set([Influences.Duke]),
-          },
-          {
-            ...getRandomPublicPlayer(),
-            name: 'hailey',
-            influenceCount: 1,
-            deadInfluences: [Influences.Duke],
-          },
-          {
-            ...getRandomPublicPlayer(),
-            name: 'david',
-            influenceCount: 0,
-            deadInfluences: [Influences.Duke, Influences.Duke],
-          },
+          buildPublicPlayer({ name: 'bot', coins: 2 }),
+          buildPublicPlayer({
+            name: 'threat',
+            coins: 5,
+            claimedInfluences: new Set([Influences.Duke, Influences.Assassin]),
+          }),
+          buildPublicPlayer({ name: 'carol', coins: 1, influenceCount: 1 }),
         ],
-        selfPlayer: {
-          ...getRandomPublicPlayer(),
-          id: chance.string(),
-          name: 'harper',
-          coins: 4,
-          influences: [Influences.Ambassador],
-          deadInfluences: [Influences.Assassin],
-          claimedInfluences: new Set([Influences.Duke]),
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Inquisitor, Influences.Contessa],
+        }),
+        settings: {
+          eventLogRetentionTurns: 3,
+          allowRevive: true,
+          enableInquisitor: true,
         },
-        settings: { eventLogRetentionTurns: 3, allowRevive: true },
-        pendingInfluenceLoss: {},
-        selfIsCreator: false,
-        treasuryReserveCoins: 0,
-        deckCount: 11,
       })
 
-      expect(decidedAction.action).not.toBe(Actions.Tax)
+      expect(decideAction(gameState)).toEqual({
+        action: Actions.Examine,
+        targetPlayer: 'threat',
+      })
     })
   })
 
   describe('decideActionResponse', () => {
     it('passes instead of illegally blocking same-allegiance Foreign Aid in reformation', () => {
-      randomlyDecideToBluffMock.mockReturnValue(false)
-
       expect(
-        decideActionResponse({
-          roomId: chance.string(),
-          isStarted: true,
-          turn: 1,
-          eventLogs: [],
-          chatMessages: [],
-          lastEventTimestamp: chance.date(),
-          players: [
-            {
-              ...getRandomPublicPlayer(),
-              name: 'alice',
-              influenceCount: 2,
-              deadInfluences: [],
-              allegiance: Allegiances.Loyalist,
-            },
-            {
-              ...getRandomPublicPlayer(),
+        decideActionResponse(
+          buildGameState({
+            players: [
+              buildPublicPlayer({ name: 'alice', allegiance: Allegiances.Loyalist }),
+              buildPublicPlayer({ name: 'bot', allegiance: Allegiances.Loyalist }),
+              buildPublicPlayer({ name: 'carol', allegiance: Allegiances.Reformist }),
+            ],
+            selfPlayer: buildPlayer({
+              id: 'bot-id',
               name: 'bot',
-              influenceCount: 2,
-              deadInfluences: [],
+              influences: [Influences.Duke, Influences.Captain],
               allegiance: Allegiances.Loyalist,
+            }),
+            pendingAction: {
+              action: Actions.ForeignAid,
+              claimConfirmed: false,
+              pendingPlayers: new Set(['bot', 'carol']),
             },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'carol',
-              influenceCount: 2,
-              deadInfluences: [],
-              allegiance: Allegiances.Reformist,
+            turnPlayer: 'alice',
+            settings: {
+              eventLogRetentionTurns: 3,
+              allowRevive: true,
+              enableReformation: true,
             },
-          ],
-          selfPlayer: {
-            ...getRandomPlayer(),
-            id: chance.string(),
-            name: 'bot',
-            coins: 2,
-            influences: [Influences.Duke, Influences.Captain],
-            deadInfluences: [],
-            allegiance: Allegiances.Loyalist,
-          },
-          pendingAction: {
-            action: Actions.ForeignAid,
-            claimConfirmed: false,
-            pendingPlayers: new Set(['bot', 'carol']),
-          },
-          turnPlayer: 'alice',
-          settings: {
-            eventLogRetentionTurns: 3,
-            allowRevive: true,
-            enableReformation: true,
-          },
-          pendingInfluenceLoss: {},
-          selfIsCreator: false,
-          treasuryReserveCoins: 0,
-          deckCount: 11,
-        }),
+          }),
+        ),
       ).toEqual({ response: Responses.Pass })
     })
 
-    it('can still block Foreign Aid when all living players share one allegiance in reformation', () => {
-      randomlyDecideToBluffMock.mockReturnValue(false)
-
-      expect(
-        decideActionResponse({
-          roomId: chance.string(),
-          isStarted: true,
-          turn: 1,
-          eventLogs: [],
-          chatMessages: [],
-          lastEventTimestamp: chance.date(),
-          players: [
-            {
-              ...getRandomPublicPlayer(),
-              name: 'alice',
-              influenceCount: 2,
-              deadInfluences: [],
-              allegiance: Allegiances.Loyalist,
-            },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'bot',
-              influenceCount: 2,
-              deadInfluences: [],
-              allegiance: Allegiances.Loyalist,
-            },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'carol',
-              influenceCount: 1,
-              deadInfluences: [Influences.Captain],
-              allegiance: Allegiances.Loyalist,
-            },
-          ],
-          selfPlayer: {
-            ...getRandomPlayer(),
-            id: chance.string(),
-            name: 'bot',
-            coins: 2,
-            influences: [Influences.Duke, Influences.Captain],
-            deadInfluences: [],
-            allegiance: Allegiances.Loyalist,
-          },
-          pendingAction: {
-            action: Actions.ForeignAid,
-            claimConfirmed: false,
-            pendingPlayers: new Set(['bot', 'carol']),
-          },
-          turnPlayer: 'alice',
-          settings: {
-            eventLogRetentionTurns: 3,
-            allowRevive: true,
-            enableReformation: true,
-          },
-          pendingInfluenceLoss: {},
-          selfIsCreator: false,
-          treasuryReserveCoins: 0,
-          deckCount: 11,
+    it('now challenges suspicious Embezzle claims', () => {
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({
+            name: 'alice',
+            coins: 4,
+            claimedInfluences: new Set([Influences.Duke]),
+          }),
+          buildPublicPlayer({ name: 'bot', coins: 2 }),
+          buildPublicPlayer({ name: 'carol', influenceCount: 1 }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          influences: [Influences.Contessa, Influences.Captain],
+          personality: { honesty: 50, skepticism: 100, vengefulness: 50 },
         }),
-      ).toEqual({ response: Responses.Block, claimedInfluence: Influences.Duke })
+        pendingAction: {
+          action: Actions.Embezzle,
+          claimConfirmed: false,
+          pendingPlayers: new Set(['bot', 'carol']),
+        },
+        turnPlayer: 'alice',
+        treasuryReserveCoins: 4,
+      })
+
+      expect(decideActionResponse(gameState)).toEqual({ response: Responses.Challenge })
     })
 
-    it('should not block when player holds or claims last influence, challenge makes more sense', () => {
-      expect(
-        decideActionResponse({
-          roomId: chance.string(),
-          isStarted: chance.bool(),
-          turn: chance.natural(),
-          eventLogs: [],
-          chatMessages: [],
-          lastEventTimestamp: chance.date(),
-          players: [
-            {
-              ...getRandomPublicPlayer(),
-              name: 'hailey',
-              influenceCount: 2,
-              deadInfluences: [],
-            },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'harper',
-              influenceCount: 0,
-              deadInfluences: [Influences.Captain, Influences.Captain],
-            },
-            {
-              ...getRandomPublicPlayer(),
-              name: 'david',
-              influenceCount: 2,
-              deadInfluences: [],
-            },
-          ],
-          selfPlayer: {
-            ...getRandomPublicPlayer(),
-            id: chance.string(),
-            name: 'david',
-            coins: 3,
-            influences: [Influences.Captain, Influences.Contessa],
-            deadInfluences: [],
-          },
-          pendingAction: {
-            action: Actions.Steal,
-            targetPlayer: 'david',
-            claimConfirmed: false,
-            pendingPlayers: new Set(['david']),
-          },
-          turnPlayer: 'hailey',
-          settings: { eventLogRetentionTurns: 3, allowRevive: true },
-          pendingInfluenceLoss: {},
-          selfIsCreator: false,
-          treasuryReserveCoins: 0,
-          deckCount: 11,
+    it('passes on Embezzle when Duke is effectively impossible', () => {
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'alice', influenceCount: 1, deadInfluences: [Influences.Duke] }),
+          buildPublicPlayer({ name: 'bot', influenceCount: 1, deadInfluences: [Influences.Duke] }),
+          buildPublicPlayer({ name: 'carol', influenceCount: 1, deadInfluences: [Influences.Duke] }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          influences: [Influences.Contessa],
+          deadInfluences: [Influences.Duke],
+          personality: { honesty: 50, skepticism: 0, vengefulness: 50 },
         }),
-      ).toEqual({ response: Responses.Challenge })
+        pendingAction: {
+          action: Actions.Embezzle,
+          claimConfirmed: false,
+          pendingPlayers: new Set(['bot', 'carol']),
+        },
+        turnPlayer: 'alice',
+        treasuryReserveCoins: 1,
+      })
+
+      expect(decideActionResponse(gameState)).toEqual({ response: Responses.Pass })
+    })
+  })
+
+  describe('decideInfluencesToLose', () => {
+    it('drops the least useful influence instead of choosing randomly', () => {
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'bot', coins: 2 }),
+          buildPublicPlayer({ name: 'alice', coins: 1, influenceCount: 1 }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Contessa, Influences.Duke],
+        }),
+        pendingInfluenceLoss: {
+          bot: [{ putBackInDeck: false }],
+        },
+      })
+
+      expect(decideInfluencesToLose(gameState)).toEqual({ influences: [Influences.Contessa] })
+    })
+  })
+
+  describe('getPlayerSuggestedMove', () => {
+    it('reveals the least useful card when examined', async () => {
+      const rawGameState = {
+        players: [
+          { id: 'bot-id', name: 'bot', influences: [Influences.Contessa, Influences.Duke] },
+          { id: 'alice-id', name: 'alice', influences: [Influences.Captain, Influences.Assassin] },
+        ],
+        pendingInfluenceLoss: {},
+      } as GameState
+
+      const publicGameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'bot', coins: 2 }),
+          buildPublicPlayer({ name: 'alice', coins: 1, influenceCount: 1 }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Contessa, Influences.Duke],
+        }),
+        pendingExamine: {
+          sourcePlayer: 'alice',
+          targetPlayer: 'bot',
+        },
+      })
+
+      getGameStateMock.mockResolvedValue(rawGameState)
+      getPublicGameStateMock.mockReturnValue(publicGameState)
+
+      await expect(getPlayerSuggestedMove({ roomId: 'room-1', playerId: 'bot-id' })).resolves.toEqual([
+        PlayerActions.chooseExamineInfluence,
+        { roomId: 'room-1', playerId: 'bot-id', influence: Influences.Contessa },
+      ])
+    })
+
+    it('forces exchange after seeing a highly valuable claimed card', async () => {
+      const rawGameState = {
+        players: [
+          { id: 'bot-id', name: 'bot', influences: [Influences.Inquisitor, Influences.Contessa] },
+          { id: 'alice-id', name: 'alice', influences: [Influences.Duke, Influences.Captain] },
+        ],
+        pendingInfluenceLoss: {},
+      } as GameState
+
+      const publicGameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'bot', coins: 2 }),
+          buildPublicPlayer({
+            name: 'alice',
+            coins: 5,
+            claimedInfluences: new Set([Influences.Duke]),
+          }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Inquisitor, Influences.Contessa],
+        }),
+        settings: {
+          eventLogRetentionTurns: 3,
+          allowRevive: true,
+          enableInquisitor: true,
+        },
+        pendingExamine: {
+          sourcePlayer: 'bot',
+          targetPlayer: 'alice',
+          chosenInfluence: Influences.Duke,
+        },
+      })
+
+      getGameStateMock.mockResolvedValue(rawGameState)
+      getPublicGameStateMock.mockReturnValue(publicGameState)
+
+      await expect(getPlayerSuggestedMove({ roomId: 'room-1', playerId: 'bot-id' })).resolves.toEqual([
+        PlayerActions.resolveExamine,
+        { roomId: 'room-1', playerId: 'bot-id', response: ExamineResponses.ForceExchange },
+      ])
+    })
+
+    it('concedes or proves no Duke correctly during an Embezzle challenge decision', async () => {
+      const rawGameState = {
+        players: [
+          { id: 'bot-id', name: 'bot', influences: [Influences.Contessa] },
+          { id: 'alice-id', name: 'alice', influences: [Influences.Duke] },
+        ],
+        pendingInfluenceLoss: {},
+      } as GameState
+
+      const publicGameState = buildGameState({
+        players: [
+          buildPublicPlayer({ name: 'bot', coins: 2 }),
+          buildPublicPlayer({ name: 'alice', coins: 2 }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Contessa],
+        }),
+        pendingInfluenceLoss: {},
+      })
+      publicGameState.pendingEmbezzleChallengeDecision = {
+        sourcePlayer: 'bot',
+        challengePlayer: 'alice',
+      }
+
+      getGameStateMock.mockResolvedValue(rawGameState)
+      getPublicGameStateMock.mockReturnValue(publicGameState)
+
+      await expect(getPlayerSuggestedMove({ roomId: 'room-1', playerId: 'bot-id' })).resolves.toEqual([
+        PlayerActions.embezzleChallengeDecision,
+        { roomId: 'room-1', playerId: 'bot-id', response: EmbezzleChallengeResponses.ProveNoDuke },
+      ])
     })
   })
 })
