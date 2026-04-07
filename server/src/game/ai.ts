@@ -4,7 +4,7 @@ import { shuffle } from "../utilities/array"
 import { getCountOfEachInfluence } from "../utilities/deck"
 import { getGameState, getPublicGameState } from '../utilities/gameState'
 import { UnableToFindPlayerError } from '../utilities/errors'
-import { canPlayerChooseAction, canPlayerChooseActionChallengeResponse, canPlayerChooseActionResponse, canPlayerChooseBlockChallengeResponse, canPlayerChooseBlockResponse, canPlayerChooseEmbezzleChallengeDecision, canPlayerChooseExamineInfluence, canPlayerChooseStartingAllegiance, canPlayerResolveExamine, getLegalBlockInfluences, getLegalTargetPlayers, getRequiredInfluenceForAction } from '../../../shared/game/logic'
+import { canPlayerBlockAction, canPlayerChooseAction, canPlayerChooseActionChallengeResponse, canPlayerChooseActionResponse, canPlayerChooseBlockChallengeResponse, canPlayerChooseBlockResponse, canPlayerChooseEmbezzleChallengeDecision, canPlayerChooseExamineInfluence, canPlayerChooseStartingAllegiance, canPlayerResolveExamine, getLegalBlockInfluences, getLegalTargetPlayers, getRequiredInfluenceForAction } from '../../../shared/game/logic'
 
 const getRevealedInfluences = (gameState: PublicGameState, influence?: Influences) =>
   gameState.players.reduce((agg: Influences[], { deadInfluences }) => {
@@ -429,10 +429,19 @@ export const decideActionResponse = (gameState: PublicGameState): {
       || gameState.pendingAction!.action === Actions.ForeignAid
     )
   )
+  const canLegallyBlockAction = (
+    isBlockable
+    && canPlayerBlockAction({
+      gameState,
+      action: gameState.pendingAction!.action,
+      actionPlayerName: gameState.turnPlayer!,
+      blockPlayerName: gameState.selfPlayer.name,
+    })
+  )
 
   const legalBlockInfluences = shuffle(getLegalBlockInfluences(gameState.settings, gameState.pendingAction!.action))
 
-  if (isBlockable) {
+  if (canLegallyBlockAction) {
     for (const legalBlockInfluence of legalBlockInfluences) {
       const hasLegalBlockingInfluence = gameState.selfPlayer?.influences.includes(legalBlockInfluence)
       if (hasLegalBlockingInfluence && !randomlyDecideToNotUseOwnedInfluence()) {
@@ -453,7 +462,7 @@ export const decideActionResponse = (gameState: PublicGameState): {
     return { response: Responses.Challenge }
   }
 
-  if (isBlockable) {
+  if (canLegallyBlockAction) {
     for (const legalBlockInfluence of legalBlockInfluences) {
       const baseBluffMargin = (1 - honesty) ** 1.5 * ((isSelfTarget ? 0.4 : 0.2) + Math.random() * 0.1)
       const finalBluffMargin = getFinalBluffMargin(baseBluffMargin, legalBlockInfluence, gameState.selfPlayer)

@@ -2,6 +2,7 @@ import { vi, describe, it, expect } from 'vitest'
 import { Chance } from 'chance'
 import {
   Actions,
+  Allegiances,
   Influences,
   Player,
   PublicGameState,
@@ -524,6 +525,130 @@ describe('ai', () => {
   })
 
   describe('decideActionResponse', () => {
+    it('passes instead of illegally blocking same-allegiance Foreign Aid in reformation', () => {
+      randomlyDecideToBluffMock.mockReturnValue(false)
+
+      expect(
+        decideActionResponse({
+          roomId: chance.string(),
+          isStarted: true,
+          turn: 1,
+          eventLogs: [],
+          chatMessages: [],
+          lastEventTimestamp: chance.date(),
+          players: [
+            {
+              ...getRandomPublicPlayer(),
+              name: 'alice',
+              influenceCount: 2,
+              deadInfluences: [],
+              allegiance: Allegiances.Loyalist,
+            },
+            {
+              ...getRandomPublicPlayer(),
+              name: 'bot',
+              influenceCount: 2,
+              deadInfluences: [],
+              allegiance: Allegiances.Loyalist,
+            },
+            {
+              ...getRandomPublicPlayer(),
+              name: 'carol',
+              influenceCount: 2,
+              deadInfluences: [],
+              allegiance: Allegiances.Reformist,
+            },
+          ],
+          selfPlayer: {
+            ...getRandomPlayer(),
+            id: chance.string(),
+            name: 'bot',
+            coins: 2,
+            influences: [Influences.Duke, Influences.Captain],
+            deadInfluences: [],
+            allegiance: Allegiances.Loyalist,
+          },
+          pendingAction: {
+            action: Actions.ForeignAid,
+            claimConfirmed: false,
+            pendingPlayers: new Set(['bot', 'carol']),
+          },
+          turnPlayer: 'alice',
+          settings: {
+            eventLogRetentionTurns: 3,
+            allowRevive: true,
+            enableReformation: true,
+          },
+          pendingInfluenceLoss: {},
+          selfIsCreator: false,
+          treasuryReserveCoins: 0,
+          deckCount: 11,
+        }),
+      ).toEqual({ response: Responses.Pass })
+    })
+
+    it('can still block Foreign Aid when all living players share one allegiance in reformation', () => {
+      randomlyDecideToBluffMock.mockReturnValue(false)
+
+      expect(
+        decideActionResponse({
+          roomId: chance.string(),
+          isStarted: true,
+          turn: 1,
+          eventLogs: [],
+          chatMessages: [],
+          lastEventTimestamp: chance.date(),
+          players: [
+            {
+              ...getRandomPublicPlayer(),
+              name: 'alice',
+              influenceCount: 2,
+              deadInfluences: [],
+              allegiance: Allegiances.Loyalist,
+            },
+            {
+              ...getRandomPublicPlayer(),
+              name: 'bot',
+              influenceCount: 2,
+              deadInfluences: [],
+              allegiance: Allegiances.Loyalist,
+            },
+            {
+              ...getRandomPublicPlayer(),
+              name: 'carol',
+              influenceCount: 1,
+              deadInfluences: [Influences.Captain],
+              allegiance: Allegiances.Loyalist,
+            },
+          ],
+          selfPlayer: {
+            ...getRandomPlayer(),
+            id: chance.string(),
+            name: 'bot',
+            coins: 2,
+            influences: [Influences.Duke, Influences.Captain],
+            deadInfluences: [],
+            allegiance: Allegiances.Loyalist,
+          },
+          pendingAction: {
+            action: Actions.ForeignAid,
+            claimConfirmed: false,
+            pendingPlayers: new Set(['bot', 'carol']),
+          },
+          turnPlayer: 'alice',
+          settings: {
+            eventLogRetentionTurns: 3,
+            allowRevive: true,
+            enableReformation: true,
+          },
+          pendingInfluenceLoss: {},
+          selfIsCreator: false,
+          treasuryReserveCoins: 0,
+          deckCount: 11,
+        }),
+      ).toEqual({ response: Responses.Block, claimedInfluence: Influences.Duke })
+    })
+
     it('should not block when player holds or claims last influence, challenge makes more sense', () => {
       expect(
         decideActionResponse({

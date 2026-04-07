@@ -1,5 +1,5 @@
 import { Grid } from "@mui/material"
-import { ActionAttributes, Actions, EventMessages, Influences, PlayerActions, Responses, getLegalBlockInfluences } from '@shared'
+import { ActionAttributes, EventMessages, Influences, PlayerActions, Responses, canPlayerBlockAction, getLegalBlockInfluences } from '@shared'
 import { useMemo, useState } from "react"
 import { getPlayerId } from "../../helpers/players"
 import { useGameStateContext } from "../../contexts/GameStateContext"
@@ -19,6 +19,16 @@ function ChooseActionResponse() {
     gameState?.pendingAction
       ? getLegalBlockInfluences(gameState.settings, gameState.pendingAction.action)
       : []
+  ), [gameState])
+  const canSelfLegallyBlockPendingAction = useMemo(() => (
+    gameState?.selfPlayer && gameState?.pendingAction && gameState.turnPlayer
+      ? canPlayerBlockAction({
+        gameState,
+        action: gameState.pendingAction.action,
+        actionPlayerName: gameState.turnPlayer,
+        blockPlayerName: gameState.selfPlayer.name,
+      })
+      : false
   ), [gameState])
 
   if (!gameState?.selfPlayer || !gameState?.pendingAction) {
@@ -115,6 +125,7 @@ function ChooseActionResponse() {
               && (
                 !ActionAttributes[pendingAction.action].blockable
                 || !legalBlockInfluences.length
+                || !canSelfLegallyBlockPendingAction
                 || (
                   pendingAction.targetPlayer
                   && gameState.selfPlayer!.name !== pendingAction.targetPlayer

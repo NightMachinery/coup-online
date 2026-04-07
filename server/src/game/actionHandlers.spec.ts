@@ -1,6 +1,6 @@
 import { vi, type MockInstance, describe, it, expect, afterEach } from 'vitest'
 import Chance from 'chance'
-import { Actions, EventMessages, ExamineResponses, GameSettings, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
+import { Actions, Allegiances, EventMessages, ExamineResponses, GameSettings, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
 import {
   actionChallengeResponseHandler,
   actionHandler,
@@ -856,6 +856,51 @@ describe('actionHandlers', () => {
       expect(gameState.players[0].coins).toBe(4)
       expect(gameState.players[1].coins).toBe(2)
       expect(gameState.players[2].coins).toBe(2)
+    })
+
+    it('rejects same-allegiance Foreign Aid blocks in reformation but allows opposing-allegiance blocks', async () => {
+      const roomId = await setupTestGame([
+        { ...david, influences: [Influences.Captain, Influences.Ambassador] },
+        { ...harper, influences: [Influences.Duke, Influences.Ambassador] },
+        { ...hailey, influences: [Influences.Duke, Influences.Captain] },
+      ], {
+        ...defaultGameSettings,
+        enableReformation: true,
+      })
+
+      await mutateGameState(await getGameState(roomId), (state) => {
+        delete state.pendingStartingAllegiance
+        state.players.find(({ name }) => name === david.playerName)!.allegiance = Allegiances.Loyalist
+        state.players.find(({ name }) => name === harper.playerName)!.allegiance = Allegiances.Loyalist
+        state.players.find(({ name }) => name === hailey.playerName)!.allegiance = Allegiances.Reformist
+      })
+
+      await actionHandler({
+        roomId,
+        playerId: david.playerId,
+        action: Actions.ForeignAid,
+      })
+
+      await expect(
+        actionResponseHandler({
+          roomId,
+          playerId: harper.playerId,
+          response: Responses.Block,
+          claimedInfluence: Influences.Duke,
+        }),
+      ).rejects.toThrow(ActionNotCurrentlyAllowedError)
+
+      await actionResponseHandler({
+        roomId,
+        playerId: hailey.playerId,
+        response: Responses.Block,
+        claimedInfluence: Influences.Duke,
+      })
+
+      const gameState = await getGameState(roomId)
+
+      expect(gameState.pendingBlock?.sourcePlayer).toBe(hailey.playerName)
+      expect(gameState.pendingAction?.action).toBe(Actions.ForeignAid)
     })
 
     it('steal -> block -> failed challenge -> no steal and lost influence', async () => {
