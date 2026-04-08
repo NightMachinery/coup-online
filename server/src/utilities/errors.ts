@@ -308,6 +308,18 @@ export class OnlyLobbyCreatorCanSetGameSettingsError extends GameMutationInputEr
   }
 }
 
+export class OnlyLobbyCreatorOrModeratorCanSetGameSettingsError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'onlyLobbyCreatorOrModeratorCanSetGameSettings',
+      language
+    })
+  }
+}
+
 export class OnlyLobbyCreatorCanSetPlayerControllerError extends GameMutationInputError {
   getMessage: (language: AvailableLanguageCode) => string
 
@@ -315,6 +327,30 @@ export class OnlyLobbyCreatorCanSetPlayerControllerError extends GameMutationInp
     super()
     this.getMessage = (language) => translate({
       key: 'onlyLobbyCreatorCanSetPlayerController',
+      language
+    })
+  }
+}
+
+export class OnlyLobbyCreatorOrModeratorCanManageModeratorsError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'onlyLobbyCreatorOrModeratorCanManageModerators',
+      language
+    })
+  }
+}
+
+export class OnlyLobbyCreatorCanDemoteModeratorsError extends GameMutationInputError {
+  getMessage: (language: AvailableLanguageCode) => string
+
+  constructor() {
+    super()
+    this.getMessage = (language) => translate({
+      key: 'onlyLobbyCreatorCanDemoteModerators',
       language
     })
   }

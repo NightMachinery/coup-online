@@ -53,6 +53,13 @@ function WaitingRoom() {
     playerId: string
     settings: GameSettings
   }>({ action: PlayerActions.setGameSettings })
+  const setModeratorMutation = useGameMutation<{
+    roomId: string
+    playerId: string
+    isModerator: boolean
+    targetPlayerName?: string
+    targetSpectatorId?: string
+  }>({ action: PlayerActions.setModerator })
 
   const setEditableSettingsState = (settings: EditableGameSettings) => {
     setEventLogRetentionTurns(settings.eventLogRetentionTurns)
@@ -93,13 +100,10 @@ function WaitingRoom() {
   }
 
   const inviteLink = `${window.location.origin}/join-game?roomId=${gameState.roomId}`
-  const creatorDisplayName = gameState.creatorPlayerName ?? gameState.creatorDisplayName
-  const selfIsCreator = gameState.selfIsCreator
-  const creatorIsPresent = !!gameState.creatorPlayerName
-    || (!!gameState.creatorDisplayName
-      && !gameState.players.some(({ name }) => name === gameState.creatorDisplayName))
-  const startDisabled = gameState.players.length < 2 || (creatorIsPresent && !selfIsCreator)
-  const canEditSettings = creatorIsPresent ? selfIsCreator : !!gameState.selfPlayer
+  const selfIsPrivileged = gameState.selfIsCreator || gameState.selfIsModerator
+  const canManageLobby = selfIsPrivileged || (!gameState.connectedLobbyAuthorityPresent && !!gameState.selfPlayer)
+  const startDisabled = gameState.players.length < 2 || !canManageLobby
+  const canEditSettings = canManageLobby
 
   const updateSettings = (settings: EditableGameSettings, autoSave?: boolean) => {
     setEditableSettingsState(settings)
@@ -185,7 +189,7 @@ function WaitingRoom() {
             {(t('copyInviteLink'))}
           </Button>
         </Grid>
-        {(!!gameState.selfPlayer || selfIsCreator) && (
+        {(!!gameState.selfPlayer || gameState.selfIsCreator) && (
           <Grid>
             <Button
               variant="contained"
@@ -199,7 +203,7 @@ function WaitingRoom() {
             </Button>
           </Grid>
         )}
-        {(!!gameState.selfPlayer || selfIsCreator) && (
+        {(!!gameState.selfPlayer || selfIsPrivileged) && (
           <Grid>
             <Button
               variant='contained'
@@ -221,12 +225,9 @@ function WaitingRoom() {
                   {t('addPlayersToStartGame')}
                 </CoupTypography>
               )}
-              {gameState.players.length >= 2 && creatorIsPresent && !selfIsCreator && (
+              {gameState.players.length >= 2 && gameState.connectedLobbyAuthorityPresent && !selfIsPrivileged && (
                 <CoupTypography mt={2} addTextShadow>
-                  {t('onlyLobbyCreatorCanStartGame', {
-                    primaryPlayer: creatorDisplayName,
-                    gameState
-                  })}
+                  {t('onlyLobbyCreatorOrModeratorCanStartGame')}
                 </CoupTypography>
               )}
               {gameState.players.length === 2 && (
@@ -259,6 +260,46 @@ function WaitingRoom() {
                   {t('speedRoundSeconds')}: {gameState.settings.speedRoundSeconds}
                 </CoupTypography>
               )}
+            </Box>
+          </Grid>
+        )}
+        {gameState.selfIsCreator && !!gameState.spectators?.length && (
+          <Grid>
+            <CoupTypography variant="h6" addTextShadow mb={1}>
+              {t('connectedSpectators')}
+            </CoupTypography>
+            <Box display="grid" gap={1}>
+              {gameState.spectators.map((spectator) => (
+                <Box
+                  key={spectator.id}
+                  display="flex"
+                  justifyContent="space-between"
+                  alignItems="center"
+                  gap={1}
+                >
+                  <CoupTypography addTextShadow>
+                    {spectator.name}
+                    {spectator.isModerator ? ` (${t('moderator')})` : ''}
+                  </CoupTypography>
+                  {spectator.isModerator && (
+                    <Button
+                      size="small"
+                      variant="contained"
+                      disabled={setModeratorMutation.isMutating}
+                      onClick={() => {
+                        setModeratorMutation.trigger({
+                          roomId: gameState.roomId,
+                          playerId: getPlayerId(),
+                          isModerator: false,
+                          targetSpectatorId: spectator.id,
+                        })
+                      }}
+                    >
+                      {t('demoteMod')}
+                    </Button>
+                  )}
+                </Box>
+              ))}
             </Box>
           </Grid>
         )}

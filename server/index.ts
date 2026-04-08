@@ -4,7 +4,7 @@ import { json } from 'body-parser'
 import cors from 'cors'
 import Joi, { ObjectSchema } from 'joi'
 import { Actions, Allegiances, EmbezzleChallengeResponses, ExamineResponses, Influences, Responses, DehydratedPublicGameState, PlayerActions, ServerEvents, AiPersonality, GameSettings, PlayerControllers } from '../shared/types/game'
-import { actionChallengeResponseHandler, actionHandler, actionResponseHandler, addAiPlayerHandler, blockChallengeResponseHandler, blockResponseHandler, checkAutoMoveHandler, chooseExamineInfluenceHandler, chooseStartingAllegianceHandler, createGameHandler, embezzleChallengeDecisionHandler, setChatMessageDeletedHandler, getGameStateHandler, joinGameHandler, loseInfluencesHandler, removeFromGameHandler, resetGameHandler, resetGameRequestCancelHandler, resetGameRequestHandler, resolveExamineHandler, sendChatMessageHandler, setGameSettingsHandler, setPlayerControllerHandler, startGameHandler, setEmojiOnChatMessageHandler, forfeitGameHandler } from './src/game/actionHandlers'
+import { actionChallengeResponseHandler, actionHandler, actionResponseHandler, addAiPlayerHandler, blockChallengeResponseHandler, blockResponseHandler, checkAutoMoveHandler, chooseExamineInfluenceHandler, chooseStartingAllegianceHandler, createGameHandler, embezzleChallengeDecisionHandler, setChatMessageDeletedHandler, getGameStateHandler, joinGameHandler, loseInfluencesHandler, removeFromGameHandler, resetGameHandler, resetGameRequestCancelHandler, resetGameRequestHandler, resolveExamineHandler, sendChatMessageHandler, setGameSettingsHandler, setModeratorHandler, setPlayerControllerHandler, startGameHandler, setEmojiOnChatMessageHandler, forfeitGameHandler } from './src/game/actionHandlers'
 import { GameMutationInputError, WrongPlayerIdOnSocketError } from './src/utilities/errors'
 import { Server as ioServer, Socket } from 'socket.io'
 import { getGameState, getPublicGameState } from './src/utilities/gameState'
@@ -219,6 +219,32 @@ const eventHandlers: {
       playerName: playerNameRule,
       language: languageRule
     })
+  },
+  [PlayerActions.setModerator]: {
+    handler: setModeratorHandler,
+    express: {
+      method: 'post',
+      parseParams: (req) => {
+        const roomId: string = req.body.roomId
+        const playerId: string = req.body.playerId
+        const isModerator: boolean = req.body.isModerator
+        const targetPlayerName: string | undefined = typeof req.body.targetPlayerName === 'string'
+          ? req.body.targetPlayerName.trim()
+          : undefined
+        const targetSpectatorId: string | undefined = req.body.targetSpectatorId
+        const language: AvailableLanguageCode = req.body.language
+        return { roomId, playerId, isModerator, targetPlayerName, targetSpectatorId, language }
+      },
+      validator: validateExpressBody
+    },
+    joiSchema: Joi.object().keys({
+      roomId: Joi.string().required(),
+      playerId: Joi.string().required(),
+      isModerator: Joi.bool().required(),
+      targetPlayerName: optionalPlayerNameRule,
+      targetSpectatorId: Joi.string().guid().optional(),
+      language: languageRule
+    }).xor('targetPlayerName', 'targetSpectatorId')
   },
   [PlayerActions.startGame]: {
     handler: startGameHandler,

@@ -92,21 +92,29 @@ export const getRoomPresence = ({
 
 export const getPublicSpectatorsForRoom = ({
   roomId,
-  currentPlayerIds
+  currentPlayerIds,
+  moderatorViewerIds,
 }: {
   roomId: string
   currentPlayerIds: Set<string>
+  moderatorViewerIds?: Set<string>
 }): Spectator[] => {
   cleanupRoomPresence(roomId)
   return [...(roomPresence.get(roomId)?.values() ?? [])]
     .filter(({ viewerId, name }) => !currentPlayerIds.has(viewerId) && !!name)
     .sort((a, b) => a.name!.localeCompare(b.name!))
-    .map(({ spectatorId, name, uid, photoURL }) => ({
+    .map(({ viewerId, spectatorId, name, uid, photoURL }) => ({
       id: spectatorId,
       name: name!,
+      isModerator: moderatorViewerIds?.has(viewerId) ?? false,
       ...(uid && { uid }),
       ...(photoURL && { photoURL }),
     }))
+}
+
+export const getConnectedViewerIdsForRoom = (roomId: string) => {
+  cleanupRoomPresence(roomId)
+  return new Set([...(roomPresence.get(roomId)?.keys() ?? [])])
 }
 
 export const getViewerIdForSpectator = ({

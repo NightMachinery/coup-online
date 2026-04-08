@@ -27,6 +27,7 @@ export enum PlayerActions {
   joinGame = 'joinGame',
   addAiPlayer = 'addAiPlayer',
   removeFromGame = 'removeFromGame',
+  setModerator = 'setModerator',
   startGame = 'startGame',
   setGameSettings = 'setGameSettings',
   setPlayerController = 'setPlayerController',
@@ -272,6 +273,7 @@ export type PublicPlayer = Omit<
 > & {
   influenceCount: number;
   influences?: Influences[];
+  isModerator: boolean;
 };
 
 export type DehydratedPublicPlayer = Omit<
@@ -285,6 +287,7 @@ export type DehydratedPublicPlayer = Omit<
 export type Spectator = {
   id: string;
   name: string;
+  isModerator: boolean;
   uid?: string;
   photoURL?: string;
 };
@@ -362,6 +365,7 @@ export type GameState = {
   chatMessages: ChatMessage[];
   lastEventTimestamp: Date;
   creatorPlayerId?: string;
+  moderatorViewerIds: string[];
   isStarted: boolean;
   availablePlayerColors: string[];
   players: Player[];
@@ -438,6 +442,8 @@ export type PublicGameState = Pick<
     selfPlayer?: Player;
     deckCount: number;
     selfIsCreator: boolean;
+    selfIsModerator: boolean;
+    connectedLobbyAuthorityPresent: boolean;
     creatorPlayerName?: string;
     creatorDisplayName?: string;
     spectators?: Spectator[];

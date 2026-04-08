@@ -6,11 +6,13 @@ import { MaterialThemeContextProvider } from '../../contexts/MaterialThemeContex
 const mockGameState = {
   roomId: 'ROOM1',
   players: [
-    { name: 'Alice', influenceCount: 2, ai: false },
-    { name: 'Bob', influenceCount: 2, ai: false },
+    { name: 'Alice', influenceCount: 2, ai: false, isModerator: false },
+    { name: 'Bob', influenceCount: 2, ai: false, isModerator: false },
   ],
   selfPlayer: { name: 'Alice' },
   selfIsCreator: true,
+  selfIsModerator: false,
+  connectedLobbyAuthorityPresent: true,
   creatorPlayerName: 'Alice',
   creatorDisplayName: 'Alice',
   settings: {
@@ -21,6 +23,7 @@ const mockGameState = {
     eventLogRetentionTurns: 3,
     speedRoundSeconds: 15,
   },
+  spectators: [] as { id: string; name: string; isModerator: boolean }[],
 }
 
 vi.mock('../game/Players', () => ({
@@ -129,5 +132,21 @@ describe('WaitingRoom', () => {
 
     mockGameState.selfIsCreator = true
     mockGameState.selfPlayer = { name: 'Alice' }
+  })
+
+  it('shows connected spectator moderators to the creator', () => {
+    mockGameState.spectators = [{ id: 'spec-1', name: 'Spectator Sam', isModerator: true }]
+
+    render(
+      <MaterialThemeContextProvider>
+        <WaitingRoom />
+      </MaterialThemeContextProvider>
+    )
+
+    expect(screen.getByText('connectedSpectators')).toBeInTheDocument()
+    expect(screen.getByText(/Spectator Sam/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'demoteMod' })).toBeInTheDocument()
+
+    mockGameState.spectators = []
   })
 })

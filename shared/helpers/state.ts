@@ -70,6 +70,7 @@ export const dehydrateGameState = (hydrated: GameState): DehydratedGameState => 
   settings: hydrated.settings,
   treasuryReserveCoins: hydrated.treasuryReserveCoins,
   availablePlayerColors: hydrated.availablePlayerColors,
+  moderatorViewerIds: hydrated.moderatorViewerIds,
   ...(hydrated.creatorPlayerId !== undefined && { creatorPlayerId: hydrated.creatorPlayerId }),
   players: hydrated.players.map((player) => ({
     ...player,
@@ -86,6 +87,8 @@ export const dehydratePublicGameState = (hydrated: PublicGameState): DehydratedP
   settings: hydrated.settings,
   treasuryReserveCoins: hydrated.treasuryReserveCoins,
   selfIsCreator: hydrated.selfIsCreator,
+  selfIsModerator: hydrated.selfIsModerator,
+  connectedLobbyAuthorityPresent: hydrated.connectedLobbyAuthorityPresent,
   ...(hydrated.creatorPlayerName !== undefined && { creatorPlayerName: hydrated.creatorPlayerName }),
   ...(hydrated.creatorDisplayName !== undefined && { creatorDisplayName: hydrated.creatorDisplayName }),
   players: hydrated.players.map((player) => ({
@@ -165,6 +168,7 @@ export const rehydrateGameState = (dehydrated: DehydratedGameState): GameState =
     settings: dehydrated.settings,
     treasuryReserveCoins: dehydrated.treasuryReserveCoins,
     availablePlayerColors: dehydrated.availablePlayerColors,
+    moderatorViewerIds: dehydrated.moderatorViewerIds ?? [],
     ...(dehydrated.creatorPlayerId !== undefined && { creatorPlayerId: dehydrated.creatorPlayerId }),
     players: dehydrated.players.map((player) => ({
       ...player,
@@ -182,6 +186,8 @@ export const rehydratePublicGameState = (dehydrated: DehydratedPublicGameState):
   settings: dehydrated.settings,
   treasuryReserveCoins: dehydrated.treasuryReserveCoins,
   selfIsCreator: dehydrated.selfIsCreator,
+  selfIsModerator: dehydrated.selfIsModerator ?? false,
+  connectedLobbyAuthorityPresent: dehydrated.connectedLobbyAuthorityPresent ?? false,
   ...(dehydrated.creatorPlayerName !== undefined && { creatorPlayerName: dehydrated.creatorPlayerName }),
   ...(dehydrated.creatorDisplayName !== undefined && { creatorDisplayName: dehydrated.creatorDisplayName }),
   players: dehydrated.players.map((player) => ({

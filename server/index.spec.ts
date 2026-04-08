@@ -1043,7 +1043,7 @@ describe('index', () => {
 
             return { roomId, playerId: otherPlayerId }
           },
-          error: 'Only the lobby creator can start the game',
+          error: 'Only the lobby creator or a moderator can start the game',
           status: 400,
         },
         {
@@ -1186,7 +1186,7 @@ describe('index', () => {
               settings: { eventLogRetentionTurns: 50, allowRevive: true },
             }
           },
-          error: 'Only the lobby creator can change settings',
+          error: 'Only the lobby creator or a moderator can change settings',
           status: 400,
         },
         {

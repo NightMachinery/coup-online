@@ -46,6 +46,7 @@ const getRandomGameState = ({
     isStarted: false,
     availablePlayerColors: chance.n(chance.color, MAX_PLAYER_COUNT),
     players,
+    moderatorViewerIds: [],
     pendingInfluenceLoss: {},
     treasuryReserveCoins: 0,
     roomId: chance.string(),

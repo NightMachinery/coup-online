@@ -8,6 +8,7 @@ import { ActionNotCurrentlyAllowedError, UnableToDetermineNextPlayerTurnError, U
 import { MAX_PLAYER_COUNT } from "../../../shared/helpers/playerCount"
 import { getOpposingAllegiance } from '../../../shared/game/logic'
 import { recordTurnSurvived, recordAssassination, recordInfluenceKill, recordSteal } from './statsAccumulator'
+import { reconcileModerators } from '../utilities/moderators'
 
 
 export const getLivingPlayers = (state: Pick<GameState, 'players'>) =>
@@ -46,6 +47,7 @@ export const killPlayerInfluence = (state: GameState, playerName: string, influe
       primaryPlayer: player.name
     })
     delete state.pendingInfluenceLoss[player.name]
+    reconcileModerators(state)
   }
 
   if (!Object.keys(state.pendingInfluenceLoss).length && !state.pendingAction) {
@@ -198,6 +200,7 @@ const getNewGameState = (roomId: string, settings: GameSettings): GameState => (
   chatMessages: [],
   lastEventTimestamp: new Date(),
   turn: 1,
+  moderatorViewerIds: [],
   settings
 })
 
@@ -294,6 +297,7 @@ export const resetGame = async (roomId: string) => {
   if (oldGameState.creatorPlayerId !== undefined) {
     newGameState.creatorPlayerId = oldGameState.creatorPlayerId
   }
+  newGameState.moderatorViewerIds = oldGameState.moderatorViewerIds
   newGameState.players = oldGameState.players.map((player) => ({
     ...player,
     coins: 2,
@@ -306,6 +310,7 @@ export const resetGame = async (roomId: string) => {
   newGameState.players.forEach((player) => {
     delete player.allegiance
   })
+  reconcileModerators(newGameState)
   newGameState.deck = createDeckForPlayerCount(newGameState.players.length, newGameState.settings)
   newGameState.availablePlayerColors = oldGameState.availablePlayerColors
   newGameState.chatMessages = oldGameState.chatMessages

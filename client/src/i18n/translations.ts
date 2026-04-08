@@ -101,6 +101,8 @@ export type Translations = ActionMessages &
     [EventMessages.PlayerControllerSetToBot]: TranslationsForString
     [EventMessages.PlayerControllerAssignedToHuman]: TranslationsForString
     assignToSpectator: TranslationsForString
+    connectedSpectators: TranslationsForString
+    demoteMod: TranslationsForString
     forfeit: TranslationsForString
     forfeitConfirmationMessage: TranslationsForString
     forfeitConfirmationTitle: TranslationsForString
@@ -134,6 +136,7 @@ export type Translations = ActionMessages &
     notEnoughCoins: TranslationsForString
     numberOfPlayers: TranslationsForString
     optional: TranslationsForString
+    moderator: TranslationsForString
     pageNotFound: TranslationsForString
     payCoins: TranslationsForString
     personalityIsHidden: TranslationsForString
@@ -253,6 +256,7 @@ export type Translations = ActionMessages &
     turns: TranslationsForString
     noAchievementsYet: TranslationsForString
     onlyLobbyCreatorCanStartGame: TranslationsForString
+    onlyLobbyCreatorOrModeratorCanStartGame: TranslationsForString
     headToHead: TranslationsForString
     opponent: TranslationsForString
     player: TranslationsForString
@@ -269,12 +273,14 @@ export type Translations = ActionMessages &
     somethingWentWrong: TranslationsForString
     tryAgain: TranslationsForString
     save: TranslationsForString
+    promoteToMod: TranslationsForString
     switchToBot: TranslationsForString
     deleteAccount: TranslationsForString
     deleteAccountConfirmTitle: TranslationsForString
     deleteAccountConfirmMessage: TranslationsForString
     yourRanking: TranslationsForString
     notEnoughGames: TranslationsForString
+    waitingOnPlayersNamed: TranslationsForString
   }
 
 const translations: Translations = {
@@ -472,6 +478,7 @@ const translations: Translations = {
     'it-IT': 'Assegna a spettatore',
     'pt-BR': 'Atribuir ao espectador',
   },
+  connectedSpectators: untranslated('Connected Spectators'),
   bestStreak: {
     'de-DE': 'Beste Serie',
     'en-US': 'Best Streak',
@@ -1742,6 +1749,7 @@ const translations: Translations = {
     'it-IT': 'Numero di Giocatori',
     'pt-BR': 'Número de Jogadores',
   },
+  moderator: untranslated('Mod'),
   onlyLobbyCreatorCanStartGame: {
     'de-DE': 'Nur {{primaryPlayer}} kann das Spiel starten',
     'en-US': 'Only {{primaryPlayer}} can start the game',
@@ -1751,6 +1759,7 @@ const translations: Translations = {
     'it-IT': 'Solo {{primaryPlayer}} può avviare la partita',
     'pt-BR': 'Somente {{primaryPlayer}} pode iniciar o jogo',
   },
+  onlyLobbyCreatorOrModeratorCanStartGame: untranslated('Only the lobby creator or a moderator can start the game'),
   opponent: {
     'de-DE': 'Gegner',
     'en-US': 'Opponent',
@@ -2597,6 +2606,8 @@ const translations: Translations = {
     'it-IT': 'turni',
     'pt-BR': 'turnos',
   },
+  demoteMod: untranslated('Demote Mod'),
+  promoteToMod: untranslated('Promote to Mod'),
   vengefulness: {
     'de-DE': 'Rachsucht',
     'en-US': 'Vengefulness',
@@ -2624,6 +2635,7 @@ const translations: Translations = {
     'it-IT': 'In attesa di altri giocatori',
     'pt-BR': 'Aguardando outros jogadores',
   },
+  waitingOnPlayersNamed: untranslated('Waiting on: {{players}}'),
   warning: {
     'de-DE': 'Warnung',
     'en-US': 'Warning',

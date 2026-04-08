@@ -17,8 +17,12 @@ import ChooseEmbezzleChallengeDecision from './ChooseEmbezzleChallengeDecision'
 function PlayerDecision() {
   const { gameState } = useGameStateContext()
 
-  if (!gameState?.selfPlayer?.influences.length) {
+  if (!gameState) {
     return null
+  }
+
+  if (!gameState.selfPlayer || !gameState.selfPlayer.influences.length) {
+    return <WaitingOnOtherPlayers />
   }
 
   let decision: React.ReactNode = null

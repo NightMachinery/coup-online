@@ -67,6 +67,7 @@ const createTestGameState = ({
     lastEventTimestamp: new Date(),
     isStarted: true,
     availablePlayerColors: [],
+    moderatorViewerIds: [],
     players,
     pendingInfluenceLoss: {},
     treasuryReserveCoins: 0,

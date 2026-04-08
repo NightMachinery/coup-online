@@ -1,4 +1,4 @@
-import { Badge, Box, Button, Grid, MenuItem, Paper, TextField, Tooltip, Typography, useTheme } from "@mui/material"
+import { Badge, Box, Button, Chip, Grid, MenuItem, Paper, TextField, Tooltip, Typography, useTheme } from "@mui/material"
 import { colord } from 'colord'
 import { useGameStateContext } from "../../contexts/GameStateContext"
 import { Close, MonetizationOn } from "@mui/icons-material"
@@ -28,6 +28,13 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
     targetController: PlayerControllers
     spectatorId?: string
   }>({ action: PlayerActions.setPlayerController })
+  const moderatorMutation = useGameMutation<{
+    roomId: string
+    playerId: string
+    isModerator: boolean
+    targetPlayerName?: string
+    targetSpectatorId?: string
+  }>({ action: PlayerActions.setModerator })
 
   if (!gameState) {
     return null
@@ -35,18 +42,25 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
 
   const colorModeFactor = theme.palette.mode === LIGHT_COLOR_MODE ? -1 : 1
   const waitingOnPlayers = getWaitingOnPlayers(gameState)
-  const humanPlayers = gameState.players.filter(({ ai }) => !ai)
   const creatorCanManageSeats = gameState.isStarted && gameState.selfIsCreator && !inWaitingRoom
   const availableSpectators = gameState.spectators ?? []
   const gameIsOver = gameState.players.filter(({ influenceCount }) => influenceCount).length === 1
+  const selfIsPrivileged = gameState.selfIsCreator || gameState.selfIsModerator
+  const canManageModerators = inWaitingRoom && selfIsPrivileged
+  const currentPlayerName = gameState.selfPlayer?.name
 
   return (
     <Grid container justifyContent="center" spacing={3}>
       {gameState.players
-        .map(({ name, color, coins, influenceCount, deadInfluences, influences: liveInfluences, ai, personality, allegiance }, index) => {
+        .map(({ name, color, coins, influenceCount, deadInfluences, influences: liveInfluences, ai, personality, allegiance, isModerator }, index) => {
           const playerColor = gameState.isStarted && !influenceCount ? '#777777' : color
           const cardTextColor = theme.palette.mode === LIGHT_COLOR_MODE ? 'white' : 'black'
           const isWaitingOnPlayer = waitingOnPlayers.some(({ name: waitingOnName }) => waitingOnName === name)
+          const canRemovePlayer = inWaitingRoom
+            && gameState.players.length > 1
+            && (selfIsPrivileged || currentPlayerName === name)
+          const canPromoteToModerator = canManageModerators && !ai && !isModerator
+          const canDemoteModerator = canManageModerators && !ai && isModerator && gameState.selfIsCreator
 
           const influences = gameState.isStarted ? [
             ...deadInfluences,
@@ -61,7 +75,7 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
           return (
             <Badge
               key={index}
-              invisible={!inWaitingRoom || (!ai && humanPlayers.length === 1) || !gameState.selfPlayer}
+              invisible={!canRemovePlayer}
               badgeContent={
                 <Button
                   sx={{
@@ -110,6 +124,13 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
                 >
                   <OverflowTooltip>{name}</OverflowTooltip>
                 </Typography>
+                {isModerator && (
+                  <Chip
+                    size="small"
+                    label={t('moderator')}
+                    sx={{ mt: 0.5, mb: 0.5, fontWeight: 'bold' }}
+                  />
+                )}
                 {gameState.settings.enableReformation && allegiance && (
                   <Typography variant="caption" sx={{ color: cardTextColor, display: 'block' }}>
                     {t(allegiance as never)}
@@ -180,6 +201,44 @@ function Players({ inWaitingRoom = false }: Readonly<{ inWaitingRoom?: boolean }
                     )
                   })}
                 </Grid>
+                {inWaitingRoom && (canPromoteToModerator || canDemoteModerator) && (
+                  <Box mt={1} display="grid" gap={1}>
+                    {canPromoteToModerator && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={moderatorMutation.isMutating}
+                        onClick={() => {
+                          moderatorMutation.trigger({
+                            roomId: gameState.roomId,
+                            playerId: getPlayerId(),
+                            isModerator: true,
+                            targetPlayerName: name,
+                          })
+                        }}
+                      >
+                        {t('promoteToMod')}
+                      </Button>
+                    )}
+                    {canDemoteModerator && (
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={moderatorMutation.isMutating}
+                        onClick={() => {
+                          moderatorMutation.trigger({
+                            roomId: gameState.roomId,
+                            playerId: getPlayerId(),
+                            isModerator: false,
+                            targetPlayerName: name,
+                          })
+                        }}
+                      >
+                        {t('demoteMod')}
+                      </Button>
+                    )}
+                  </Box>
+                )}
                 {creatorCanManageSeats && influenceCount > 0 && (
                   <Box mt={1} display="grid" gap={1}>
                     {!ai && (

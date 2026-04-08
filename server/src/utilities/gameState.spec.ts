@@ -75,6 +75,7 @@ const getRandomGameState = ({
     isStarted: chance.bool(),
     availablePlayerColors: chance.n(chance.color, MAX_PLAYER_COUNT),
     players: [],
+    moderatorViewerIds: [],
     pendingInfluenceLoss: {},
     treasuryReserveCoins: 0,
     roomId: chance.string(),
@@ -132,6 +133,8 @@ describe('gameState', () => {
         lastEventTimestamp: gameState.lastEventTimestamp,
         isStarted: gameState.isStarted,
         selfIsCreator: selfPlayer.id === lobbyCreator.id,
+        selfIsModerator: false,
+        connectedLobbyAuthorityPresent: true,
         creatorPlayerName: lobbyCreator.name,
         creatorDisplayName: lobbyCreator.name,
         turn: gameState.turn,
@@ -158,6 +161,7 @@ describe('gameState', () => {
           color: player.color,
           coins: player.coins,
           influenceCount: player.influences.length,
+          isModerator: false,
           claimedInfluences: player.claimedInfluences,
           unclaimedInfluences: player.unclaimedInfluences,
           deadInfluences: player.deadInfluences,
@@ -218,12 +222,16 @@ describe('gameState', () => {
 
       expect(getPublicGameState({ gameState, playerId: creator.id })).toMatchObject({
         selfIsCreator: true,
+        selfIsModerator: false,
+        connectedLobbyAuthorityPresent: true,
         creatorPlayerName: creator.name,
         creatorDisplayName: creator.name,
-        spectators: [{ name: 'Spectator Sam' }]
+        spectators: [{ name: 'Spectator Sam', isModerator: false }]
       })
       expect(getPublicGameState({ gameState, playerId: otherPlayer.id })).toMatchObject({
         selfIsCreator: false,
+        selfIsModerator: false,
+        connectedLobbyAuthorityPresent: true,
         creatorPlayerName: creator.name,
         creatorDisplayName: creator.name,
       })

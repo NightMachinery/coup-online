@@ -1,5 +1,5 @@
 import crypto from 'node:crypto'
-import { ActionNotChallengeableError, ActionNotCurrentlyAllowedError, BlockMayNotBeBlockedError, ClaimedInfluenceAlreadyConfirmedError, ClaimedInfluenceInvalidError, ClaimedInfluenceRequiredError, ConnectedSpectatorRequiredError, DifferentPlayerNameError, GameInProgressError, GameNeedsAtLeast2PlayersToStartError, GameNotInProgressError, GameOverError, InsufficientCoinsError, InvalidActionAt10CoinsError, MessageDoesNotExistError, MessageIsNotYoursError, MissingInfluenceError, NoDeadInfluencesError, OnlyLobbyCreatorCanSetGameSettingsError, OnlyLobbyCreatorCanSetPlayerControllerError, OnlyLobbyCreatorCanStartGameError, PlayerAlreadyBotControlledError, PlayerAlreadyHumanControlledError, PlayerNotInGameError, ReviveNotAllowedInGameError, RoomAlreadyHasPlayerError, RoomIdAlreadyExistsError, RoomIsFullError, SpeedRoundTimerExpiredError, StateChangedSinceValidationError, TargetPlayerIsSelfError, TargetPlayerNotAllowedForActionError, TargetPlayerRequiredForActionError, UnableToFindPlayerError, UnableToForfeitError, YouAreDeadError } from "../utilities/errors"
+import { ActionNotChallengeableError, ActionNotCurrentlyAllowedError, BlockMayNotBeBlockedError, ClaimedInfluenceAlreadyConfirmedError, ClaimedInfluenceInvalidError, ClaimedInfluenceRequiredError, ConnectedSpectatorRequiredError, DifferentPlayerNameError, GameInProgressError, GameNeedsAtLeast2PlayersToStartError, GameNotInProgressError, GameOverError, InsufficientCoinsError, InvalidActionAt10CoinsError, MessageDoesNotExistError, MessageIsNotYoursError, MissingInfluenceError, NoDeadInfluencesError, OnlyLobbyCreatorCanDemoteModeratorsError, OnlyLobbyCreatorCanSetPlayerControllerError, OnlyLobbyCreatorCanStartGameError, OnlyLobbyCreatorOrModeratorCanManageModeratorsError, OnlyLobbyCreatorOrModeratorCanSetGameSettingsError, PlayerAlreadyBotControlledError, PlayerAlreadyHumanControlledError, PlayerNotInGameError, ReviveNotAllowedInGameError, RoomAlreadyHasPlayerError, RoomIdAlreadyExistsError, RoomIsFullError, SpeedRoundTimerExpiredError, StateChangedSinceValidationError, TargetPlayerIsSelfError, TargetPlayerNotAllowedForActionError, TargetPlayerRequiredForActionError, UnableToFindPlayerError, UnableToForfeitError, YouAreDeadError } from "../utilities/errors"
 import { ActionAttributes, Actions, AiPersonality, Allegiances, EmbezzleChallengeResponses, EventMessages, ExamineResponses, GameSettings, GameState, Influences, PlayerActions, PlayerControllers, Responses } from "../../../shared/types/game"
 import { getConnectedLobbyCreatorPresence, getGameState, getPublicGameState, logEvent, logForcedMove, mutateGameState } from "../utilities/gameState"
 import { generateRoomId } from "../utilities/identifiers"
@@ -13,6 +13,7 @@ import { AvailableLanguageCode } from '../../../shared/i18n/availableLanguages'
 import { recordBluff, recordChallengeMade, recordCoup, recordInfluenceKill, recordInfluenceClaim, recordSuccessfulBluff, recordSuccessfulChallenge } from './statsAccumulator'
 import { getViewerIdForSpectator, removeRoomPresence, upsertRoomPresence } from '../utilities/roomPresence'
 import { createDeckForPlayerCount } from '../utilities/deck'
+import { hasConnectedLobbyAuthority, reconcileModerators, viewerIsConnectedLobbyAuthority } from '../utilities/moderators'
 
 
 const getNormalizedSettings = (settings: GameSettings): GameSettings => ({
@@ -85,6 +86,37 @@ const getPlayerInRoom = ({ gameState, playerId }: {
   if (!player) throw new PlayerNotInGameError()
 
   return player
+}
+
+const getSeatedPlayerInRoom = ({ gameState, playerId }: {
+  gameState: GameState
+  playerId: string
+}) => gameState.players.find(({ id }) => id === playerId)
+
+const reconcileRoomModerators = async (roomId: string) => {
+  const latestGameState = await getGameState(roomId)
+  await mutateGameState(latestGameState, (state) => {
+    reconcileModerators(state)
+    return { updateLastEventTimestamp: false }
+  })
+}
+
+const viewerCanManageLobby = ({
+  gameState,
+  playerId,
+}: {
+  gameState: GameState
+  playerId: string
+}) => {
+  if (viewerIsConnectedLobbyAuthority({ gameState, playerId })) {
+    return true
+  }
+
+  if (hasConnectedLobbyAuthority({ gameState })) {
+    return false
+  }
+
+  return !!getSeatedPlayerInRoom({ gameState, playerId })
 }
 
 const createRandomAiPersonality = (): AiPersonality => ({
@@ -172,6 +204,8 @@ export const getGameStateHandler = async ({ roomId, playerId, spectatorName, uid
     ...((player?.photoURL ?? photoURL) && { photoURL: player?.photoURL ?? photoURL }),
   })
 
+  await reconcileRoomModerators(gameState.roomId)
+
   return { roomId, playerId }
 }
 
@@ -196,6 +230,7 @@ export const createGameHandler = async ({ playerId, playerName, settings, uid, p
     ...(uid && { uid }),
     ...(photoURL && { photoURL }),
   })
+  await reconcileRoomModerators(roomId)
 
   return { roomId, playerId }
 }
@@ -265,6 +300,7 @@ export const joinGameHandler = async ({ roomId, playerId, playerName, uid, photo
     ...((player?.uid ?? uid) && { uid: player?.uid ?? uid }),
     ...((player?.photoURL ?? photoURL) && { photoURL: player?.photoURL ?? photoURL }),
   })
+  await reconcileRoomModerators(gameState.roomId)
 
   return { roomId, playerId }
 }
@@ -313,16 +349,24 @@ export const removeFromGameHandler = async ({ roomId, playerId, playerName }: {
 }) => {
   const gameState = await getGameState(roomId)
 
-  getPlayerInRoom({ gameState, playerId })
-
   if (gameState.isStarted) {
     throw new GameInProgressError()
+  }
+
+  const actingPlayer = getSeatedPlayerInRoom({ gameState, playerId })
+  const actingViewerIsPrivileged = viewerIsConnectedLobbyAuthority({ gameState, playerId })
+  if (!actingPlayer && !actingViewerIsPrivileged) {
+    throw new PlayerNotInGameError()
   }
 
   const playerToRemove = gameState.players.find((player) => player.name === playerName)
 
   if (!playerToRemove) {
     throw new PlayerNotInGameError()
+  }
+
+  if (!actingViewerIsPrivileged && actingPlayer?.name !== playerName) {
+    throw new ActionNotCurrentlyAllowedError()
   }
 
   await mutateGameState(gameState, (state) => {
@@ -335,6 +379,8 @@ export const removeFromGameHandler = async ({ roomId, playerId, playerName }: {
       playerId: playerToRemove.id
     })
   }
+
+  await reconcileRoomModerators(gameState.roomId)
 
   return { roomId, playerId }
 }
@@ -444,6 +490,7 @@ export const forfeitGameHandler = async ({ roomId, playerId, replaceWithAi }: {
       playerToForfeit.id = crypto.randomUUID()
       playerToForfeit.ai = true
       playerToForfeit.personalityHidden = true
+      reconcileModerators(state)
       logEvent(state, {
         event: EventMessages.PlayerReplacedWithAi,
         primaryPlayer: player.name
@@ -460,6 +507,7 @@ export const forfeitGameHandler = async ({ roomId, playerId, replaceWithAi }: {
       if (state.turnPlayer === playerToForfeit.name) {
         moveTurnToNextPlayer(state)
       }
+      reconcileModerators(state)
       logEvent(state, {
         event: EventMessages.PlayerForfeited,
         primaryPlayer: player.name
@@ -475,30 +523,27 @@ export const startGameHandler = async ({ roomId, playerId }: {
   playerId: string
 }) => {
   const gameState = await getGameState(roomId)
-  const player = gameState.players.find(({ id }) => id === playerId)
+  const player = getSeatedPlayerInRoom({ gameState, playerId })
 
   if (gameState.isStarted) {
     throw new GameInProgressError()
   }
 
-  if (gameState.players.length < 2 && gameState.creatorPlayerId !== playerId) {
+  if (!viewerCanManageLobby({ gameState, playerId })) {
+    if (hasConnectedLobbyAuthority({ gameState })) {
+      throw new OnlyLobbyCreatorCanStartGameError()
+    }
     throw new PlayerNotInGameError()
-  }
-
-  if (!player) {
-    throw new PlayerNotInGameError()
-  }
-
-  const lobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState })
-  if (lobbyCreatorPresence && gameState.creatorPlayerId !== playerId) {
-    throw new OnlyLobbyCreatorCanStartGameError()
   }
 
   if (gameState.players.length < 2) {
     throw new GameNeedsAtLeast2PlayersToStartError()
   }
 
-  await mutateGameState(gameState, startGame)
+  await mutateGameState(gameState, (state) => {
+    startGame(state)
+    reconcileModerators(state)
+  })
 
   return { roomId, playerId }
 }
@@ -509,33 +554,28 @@ export const setGameSettingsHandler = async ({ roomId, playerId, settings }: {
   settings: GameSettings
 }) => {
   const gameState = await getGameState(roomId)
-  const player = gameState.players.find(({ id }) => id === playerId)
-  const lobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState })
+  const player = getSeatedPlayerInRoom({ gameState, playerId })
 
   if (gameState.isStarted) {
     throw new GameInProgressError()
   }
 
-  if (lobbyCreatorPresence && gameState.creatorPlayerId !== playerId) {
-    throw new OnlyLobbyCreatorCanSetGameSettingsError()
-  }
-
-  if (!lobbyCreatorPresence && !player) {
+  if (!viewerCanManageLobby({ gameState, playerId })) {
+    if (hasConnectedLobbyAuthority({ gameState })) {
+      throw new OnlyLobbyCreatorOrModeratorCanSetGameSettingsError()
+    }
     throw new PlayerNotInGameError()
   }
 
   await mutateGameState(gameState, (state) => {
-    const currentLobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState: state })
-
     if (state.isStarted) {
       throw new GameInProgressError()
     }
 
-    if (currentLobbyCreatorPresence && state.creatorPlayerId !== playerId) {
-      throw new OnlyLobbyCreatorCanSetGameSettingsError()
-    }
-
-    if (!currentLobbyCreatorPresence && !state.players.find(({ id }) => id === playerId)) {
+    if (!viewerCanManageLobby({ gameState: state, playerId })) {
+      if (hasConnectedLobbyAuthority({ gameState: state })) {
+        throw new OnlyLobbyCreatorOrModeratorCanSetGameSettingsError()
+      }
       throw new PlayerNotInGameError()
     }
 
@@ -544,6 +584,100 @@ export const setGameSettingsHandler = async ({ roomId, playerId, settings }: {
       ...settings,
     })
     state.deck = createDeckForPlayerCount(state.players.length, state.settings)
+  })
+
+  return { roomId, playerId }
+}
+
+export const setModeratorHandler = async ({
+  roomId,
+  playerId,
+  isModerator,
+  targetPlayerName,
+  targetSpectatorId,
+}: {
+  roomId: string
+  playerId: string
+  isModerator: boolean
+  targetPlayerName?: string
+  targetSpectatorId?: string
+}) => {
+  const gameState = await getGameState(roomId)
+
+  if (gameState.isStarted) {
+    throw new GameInProgressError()
+  }
+
+  if (isModerator) {
+    if (!viewerIsConnectedLobbyAuthority({ gameState, playerId })) {
+      throw new OnlyLobbyCreatorOrModeratorCanManageModeratorsError()
+    }
+
+    if (!targetPlayerName || targetSpectatorId) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+
+    const targetPlayer = gameState.players.find(({ name }) => name === targetPlayerName)
+    if (!targetPlayer || targetPlayer.ai) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+
+    await mutateGameState(gameState, (state) => {
+      const stateTargetPlayer = state.players.find(({ name }) => name === targetPlayerName)
+      if (!stateTargetPlayer || stateTargetPlayer.ai) {
+        throw new ActionNotCurrentlyAllowedError()
+      }
+      if (state.moderatorViewerIds.includes(stateTargetPlayer.id)) {
+        throw new ActionNotCurrentlyAllowedError()
+      }
+
+      state.moderatorViewerIds.push(stateTargetPlayer.id)
+      reconcileModerators(state)
+      return { updateLastEventTimestamp: false }
+    })
+
+    return { roomId, playerId }
+  }
+
+  if (playerId !== gameState.creatorPlayerId) {
+    throw new OnlyLobbyCreatorCanDemoteModeratorsError()
+  }
+
+  if ((targetPlayerName && targetSpectatorId) || (!targetPlayerName && !targetSpectatorId)) {
+    throw new ActionNotCurrentlyAllowedError()
+  }
+
+  await mutateGameState(gameState, (state) => {
+    if (playerId !== state.creatorPlayerId) {
+      throw new OnlyLobbyCreatorCanDemoteModeratorsError()
+    }
+
+    let targetViewerId: string | undefined
+    if (targetPlayerName) {
+      const targetPlayer = state.players.find(({ name }) => name === targetPlayerName)
+      if (!targetPlayer || targetPlayer.ai) {
+        throw new ActionNotCurrentlyAllowedError()
+      }
+      targetViewerId = targetPlayer.id
+    } else if (targetSpectatorId) {
+      const spectator = getViewerIdForSpectator({
+        roomId: state.roomId,
+        spectatorId: targetSpectatorId,
+        currentPlayerIds: new Set(state.players.map(({ id }) => id))
+      })
+      if (!spectator) {
+        throw new ConnectedSpectatorRequiredError()
+      }
+      targetViewerId = spectator.viewerId
+    }
+
+    if (!targetViewerId || !state.moderatorViewerIds.includes(targetViewerId)) {
+      throw new ActionNotCurrentlyAllowedError()
+    }
+
+    state.moderatorViewerIds = state.moderatorViewerIds.filter((viewerId) => viewerId !== targetViewerId)
+    reconcileModerators(state)
+    return { updateLastEventTimestamp: false }
   })
 
   return { roomId, playerId }
@@ -606,6 +740,7 @@ export const setPlayerControllerHandler = async ({
         gameState: state,
         playerName: targetPlayerName
       })
+      reconcileModerators(state)
       logEvent(state, {
         event: EventMessages.PlayerControllerSetToBot,
         primaryPlayer: targetPlayerName
@@ -640,6 +775,7 @@ export const setPlayerControllerHandler = async ({
         playerName: targetPlayerName,
         spectatorId
       })
+      reconcileModerators(state)
       logEvent(state, {
         event: EventMessages.PlayerControllerAssignedToHuman,
         primaryPlayer: targetPlayerName,

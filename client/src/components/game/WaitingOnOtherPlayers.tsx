@@ -9,7 +9,13 @@ function WaitingOnOtherPlayers() {
   const { gameState } = useGameStateContext()
   const { t } = useTranslationContext()
 
-  if (!gameState?.selfPlayer) {
+  if (!gameState) {
+    return null
+  }
+
+  const waitingOnPlayers = getWaitingOnPlayers(gameState)
+
+  if (!waitingOnPlayers.length) {
     return null
   }
 
@@ -18,8 +24,14 @@ function WaitingOnOtherPlayers() {
       <CoupTypography variant="h6" my={1} fontWeight="bold" addTextShadow>
         {t('waitingOnOtherPlayers')}
       </CoupTypography>
+      <CoupTypography addTextShadow>
+        {t('waitingOnPlayersNamed', {
+          players: waitingOnPlayers.map(({ name }) => name).join(', '),
+          gameState,
+        })}
+      </CoupTypography>
       <Box>
-        {getWaitingOnPlayers(gameState).map(({ color }) =>
+        {waitingOnPlayers.map(({ color }) =>
           <Circle key={color} sx={{ color }} />
         )}
       </Box>

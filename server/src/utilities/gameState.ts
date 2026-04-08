@@ -10,6 +10,7 @@ import { GAME_STATE_TTL_SECONDS } from '../../../shared/helpers/constants'
 import { createDeckForPlayerCount, getCountOfEachInfluence } from './deck'
 import { recordGameStats } from './stats'
 import { getPublicSpectatorsForRoom, getRoomPresence } from './roomPresence'
+import { getModeratorViewerIds, hasConnectedLobbyAuthority } from './moderators'
 
 export const getGameState = async (
   roomId: string
@@ -49,6 +50,8 @@ export const getPublicGameState = ({ gameState, playerId }: {
   const connectedLobbyCreatorPresence = getConnectedLobbyCreatorPresence({ gameState })
   const currentPlayerIds = new Set(gameState.players.map(({ id }) => id))
   const selfIsCreator = playerId === gameState.creatorPlayerId
+  const moderatorViewerIds = getModeratorViewerIds(gameState)
+  const selfIsModerator = moderatorViewerIds.has(playerId)
   const creatorDisplayName = connectedLobbyCreatorPresence?.name ?? lobbyCreator?.name
   let selfPlayer: Player | undefined
   const publicPlayers: PublicPlayer[] = []
@@ -70,6 +73,7 @@ export const getPublicGameState = ({ gameState, playerId }: {
       ...(player.uid && { uid: player.uid }),
       ...(player.photoURL && { photoURL: player.photoURL }),
       ...(!player.personalityHidden && player.personality && { personality: player.personality }),
+      isModerator: moderatorViewerIds.has(player.id),
       ...(gameIsOver && { influences: player.influences })
     })
     if (player.id === playerId) {
@@ -88,6 +92,8 @@ export const getPublicGameState = ({ gameState, playerId }: {
     lastEventTimestamp: gameState.lastEventTimestamp,
     isStarted: gameState.isStarted,
     selfIsCreator,
+    selfIsModerator,
+    connectedLobbyAuthorityPresent: hasConnectedLobbyAuthority({ gameState }),
     pendingInfluenceLoss: gameState.pendingInfluenceLoss,
     players: publicPlayers,
     roomId: gameState.roomId,
@@ -104,7 +110,8 @@ export const getPublicGameState = ({ gameState, playerId }: {
   if (selfIsCreator) {
     publicGameState.spectators = getPublicSpectatorsForRoom({
       roomId: gameState.roomId,
-      currentPlayerIds
+      currentPlayerIds,
+      moderatorViewerIds,
     })
   }
   if (selfPlayer) {

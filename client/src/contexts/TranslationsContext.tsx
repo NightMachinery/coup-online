@@ -24,6 +24,7 @@ type TranslationVariables = PlayerVariables & InfluenceVariables & AllegianceVar
   gameState: PublicGameState | undefined
   count: number | undefined
   action: Actions | undefined
+  players: string | undefined
 }
 
 type TranslationContextType = {
@@ -77,6 +78,10 @@ export function TranslationContextProvider({ children }: Readonly<{ children: Re
         const plural = replaceMatch.matchAll(pluralRegex).next().value?.[1]
         return (variables.count !== 1 && plural) || ''
       })
+    }
+
+    if (variables.players !== undefined) {
+      template = template.replaceAll('{{players}}', variables.players)
     }
 
     const segments: (ReactNode)[] = [template]

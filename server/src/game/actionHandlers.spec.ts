@@ -18,6 +18,7 @@ import {
   resetGameRequestCancelHandler,
   resetGameRequestHandler,
   setGameSettingsHandler,
+  setModeratorHandler,
   setPlayerControllerHandler,
   startGameHandler,
 } from './actionHandlers'
@@ -37,7 +38,9 @@ import {
   InsufficientCoinsError,
   InvalidActionAt10CoinsError,
   MissingInfluenceError,
-  OnlyLobbyCreatorCanSetGameSettingsError,
+  OnlyLobbyCreatorCanDemoteModeratorsError,
+  OnlyLobbyCreatorOrModeratorCanManageModeratorsError,
+  OnlyLobbyCreatorOrModeratorCanSetGameSettingsError,
   OnlyLobbyCreatorCanSetPlayerControllerError,
   OnlyLobbyCreatorCanStartGameError,
   PlayerAlreadyBotControlledError,
@@ -241,7 +244,7 @@ describe('actionHandlers', () => {
       await joinGameHandler({ roomId, ...david })
       await removeFromGameHandler({
         roomId,
-        playerId: hailey.playerId,
+        playerId: harper.playerId,
         playerName: david.playerName,
       })
       await expect(
@@ -257,12 +260,16 @@ describe('actionHandlers', () => {
       ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
       await removeFromGameHandler({
         roomId,
-        playerId: hailey.playerId,
+        playerId: harper.playerId,
         playerName: harper.playerName,
       })
-      await startGameHandler({ roomId, playerId: hailey.playerId })
+      const gameStateAfterCreatorLeaves = await getGameState(roomId)
+      const moderatorAfterCreatorLeaves = gameStateAfterCreatorLeaves.players.find(({ id }) =>
+        gameStateAfterCreatorLeaves.moderatorViewerIds.includes(id)
+      )
+      await startGameHandler({ roomId, playerId: moderatorAfterCreatorLeaves!.id })
       await expect(
-        startGameHandler({ roomId, playerId: hailey.playerId }),
+        startGameHandler({ roomId, playerId: moderatorAfterCreatorLeaves!.id }),
       ).rejects.toThrow(GameInProgressError)
     })
 
@@ -291,9 +298,6 @@ describe('actionHandlers', () => {
 
       await resetGameHandler({ roomId, playerId: hailey.playerId })
 
-      await expect(
-        startGameHandler({ roomId, playerId: hailey.playerId }),
-      ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
       await startGameHandler({ roomId, playerId: harper.playerId })
     })
 
@@ -308,15 +312,12 @@ describe('actionHandlers', () => {
 
       await removeFromGameHandler({
         roomId,
-        playerId: hailey.playerId,
+        playerId: harper.playerId,
         playerName: harper.playerName,
       })
 
       await joinGameHandler({ roomId, ...harper })
 
-      await expect(
-        startGameHandler({ roomId, playerId: hailey.playerId }),
-      ).rejects.toThrow(OnlyLobbyCreatorCanStartGameError)
       await startGameHandler({ roomId, playerId: harper.playerId })
     })
 
@@ -330,6 +331,7 @@ describe('actionHandlers', () => {
 
       await mutateGameState(await getGameState(roomId), (state) => {
         delete state.creatorPlayerId
+        state.moderatorViewerIds = []
       })
 
       await startGameHandler({ roomId, playerId: hailey.playerId })
@@ -342,6 +344,7 @@ describe('actionHandlers', () => {
       })
 
       await joinGameHandler({ roomId, ...hailey })
+      await joinGameHandler({ roomId, ...marissa })
 
       await setGameSettingsHandler({
         roomId,
@@ -383,7 +386,7 @@ describe('actionHandlers', () => {
             enableReformation: true,
           },
         }),
-      ).rejects.toThrow(OnlyLobbyCreatorCanSetGameSettingsError)
+      ).rejects.toThrow(OnlyLobbyCreatorOrModeratorCanSetGameSettingsError)
 
       clearRoomPresence()
 
@@ -397,6 +400,166 @@ describe('actionHandlers', () => {
           },
         }),
       ).resolves.toEqual({ roomId, playerId: hailey.playerId })
+    })
+
+    it('should only let ordinary players remove themselves before the game starts', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+      await joinGameHandler({ roomId, ...marissa })
+
+      await expect(
+        removeFromGameHandler({
+          roomId,
+          playerId: hailey.playerId,
+          playerName: marissa.playerName,
+        }),
+      ).rejects.toThrow(ActionNotCurrentlyAllowedError)
+
+      await removeFromGameHandler({
+        roomId,
+        playerId: hailey.playerId,
+        playerName: hailey.playerName,
+      })
+
+      expect((await getGameState(roomId)).players.map(({ name }) => name)).toEqual([
+        harper.playerName,
+        marissa.playerName,
+      ])
+    })
+
+    it('should allow moderators to manage the lobby but reserve demotion for the creator', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+      await joinGameHandler({ roomId, ...marissa })
+
+      await setModeratorHandler({
+        roomId,
+        playerId: harper.playerId,
+        isModerator: true,
+        targetPlayerName: hailey.playerName,
+      })
+
+      await expect(
+        setGameSettingsHandler({
+          roomId,
+          playerId: hailey.playerId,
+          settings: {
+            ...defaultGameSettings,
+            enableReformation: true,
+          },
+        }),
+      ).resolves.toEqual({ roomId, playerId: hailey.playerId })
+
+      await expect(
+        setModeratorHandler({
+          roomId,
+          playerId: hailey.playerId,
+          isModerator: false,
+          targetPlayerName: harper.playerName,
+        }),
+      ).rejects.toThrow(OnlyLobbyCreatorCanDemoteModeratorsError)
+
+      await removeFromGameHandler({
+        playerId: hailey.playerId,
+        roomId,
+        playerName: harper.playerName,
+      })
+
+      await startGameHandler({ roomId, playerId: hailey.playerId })
+    })
+
+    it('should auto-promote a connected seated human when no moderator remains in the room', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+      await joinGameHandler({ roomId, ...marissa })
+
+      await removeFromGameHandler({
+        roomId,
+        playerId: harper.playerId,
+        playerName: harper.playerName,
+      })
+
+      const gameState = await getGameState(roomId)
+      expect(
+        gameState.players
+          .filter(({ id }) => gameState.moderatorViewerIds.includes(id))
+          .map(({ name }) => name)
+      ).toEqual(expect.arrayContaining([expect.stringMatching(/Hailey|Marissa/)]))
+    })
+
+    it('should let the creator demote a spectator moderator', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+
+      await setModeratorHandler({
+        roomId,
+        playerId: harper.playerId,
+        isModerator: true,
+        targetPlayerName: hailey.playerName,
+      })
+
+      await removeFromGameHandler({
+        roomId,
+        playerId: hailey.playerId,
+        playerName: hailey.playerName,
+      })
+
+      const creatorView = getPublicGameState({
+        gameState: await getGameState(roomId),
+        playerId: harper.playerId,
+      })
+      const haileySpectator = creatorView.spectators?.find(
+        ({ name }) => name === hailey.playerName,
+      )
+
+      expect(haileySpectator?.isModerator).toBe(true)
+
+      await setModeratorHandler({
+        roomId,
+        playerId: harper.playerId,
+        isModerator: false,
+        targetSpectatorId: haileySpectator!.id,
+      })
+
+      const gameState = await getGameState(roomId)
+      expect(gameState.moderatorViewerIds).not.toContain(hailey.playerId)
+    })
+
+    it('should reject ordinary-player moderator promotion attempts', async () => {
+      const { roomId } = await createGameHandler({
+        ...harper,
+        settings: defaultGameSettings,
+      })
+
+      await joinGameHandler({ roomId, ...hailey })
+
+      await expect(
+        setModeratorHandler({
+          roomId,
+          playerId: hailey.playerId,
+          isModerator: true,
+          targetPlayerName: harper.playerName,
+        }),
+      ).rejects.toThrow(OnlyLobbyCreatorOrModeratorCanManageModeratorsError)
+
+      const gameState = await getGameState(roomId)
+      expect(gameState.moderatorViewerIds).toContain(harper.playerId)
     })
 
     it('should let the creator switch a human player to bot control mid-game', async () => {
