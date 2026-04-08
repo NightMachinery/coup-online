@@ -911,17 +911,22 @@ export const actionHandler = async ({ roomId, playerId, action, targetPlayer, is
           throw new InsufficientCoinsError()
         }
 
-        convertingPlayer.coins -= actionCost
-        state.treasuryReserveCoins += actionCost
-        convertedPlayer.allegiance = convertedPlayer.allegiance
+        const fromAllegiance = convertedPlayer.allegiance ?? Allegiances.Loyalist
+        const toAllegiance = convertedPlayer.allegiance
           ? (convertedPlayer.allegiance === Allegiances.Loyalist ? Allegiances.Reformist : Allegiances.Loyalist)
           : Allegiances.Loyalist
+
+        convertingPlayer.coins -= actionCost
+        state.treasuryReserveCoins += actionCost
+        convertedPlayer.allegiance = toAllegiance
         moveTurnToNextPlayer(state)
         logEvent(state, {
           event: EventMessages.ActionProcessed,
           action,
           primaryPlayer: player.name,
-          ...(convertedPlayer.name !== player.name && { secondaryPlayer: convertedPlayer.name })
+          ...(convertedPlayer.name !== player.name && { secondaryPlayer: convertedPlayer.name }),
+          fromAllegiance,
+          toAllegiance,
         })
       })
     }

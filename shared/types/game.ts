@@ -227,6 +227,8 @@ export type EventMessage = {
   primaryPlayer?: string;
   secondaryPlayer?: string;
   influence?: Influences;
+  fromAllegiance?: Allegiances;
+  toAllegiance?: Allegiances;
   turn: number;
 };
 

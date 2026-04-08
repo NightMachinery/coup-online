@@ -257,6 +257,12 @@ const getConvertScore = (gameState: PublicGameState, targetPlayerName: string) =
   const beforePlayers = gameState.players
   const afterPlayers = getConvertedPlayers(beforePlayers, targetPlayerName)
   const cost = targetPlayerName === gameState.selfPlayer.name ? 1 : 2
+  const targetPlayerBefore = getPlayerByName(gameState, targetPlayerName)
+  const selfPlayerAfter = afterPlayers.find(({ name }) => name === gameState.selfPlayer!.name)
+
+  if (!targetPlayerBefore || !selfPlayerAfter) {
+    throw new UnableToFindPlayerError()
+  }
 
   let score = -cost
   beforePlayers.forEach((opponent) => {
@@ -288,6 +294,44 @@ const getConvertScore = (gameState: PublicGameState, targetPlayerName: string) =
       score -= getPlayerDangerFactor(opponent)
     }
   })
+
+  const getLivingPlayersOnAllegiance = (
+    players: PublicPlayer[],
+    allegiance?: Allegiances
+  ) => allegiance
+    ? players.filter((player) => player.influenceCount > 0 && player.allegiance === allegiance)
+    : []
+
+  const selfBeforeTeammates = getLivingPlayersOnAllegiance(beforePlayers, gameState.selfPlayer.allegiance)
+  const selfAfterTeammates = getLivingPlayersOnAllegiance(afterPlayers, selfPlayerAfter.allegiance)
+  const selfAfterOpponents = selfPlayerAfter.allegiance
+    ? afterPlayers.filter((player) =>
+      player.influenceCount > 0
+      && player.allegiance
+      && player.allegiance !== selfPlayerAfter.allegiance)
+    : []
+
+  if (selfBeforeTeammates.length === 1 && selfAfterTeammates.length >= 2) {
+    score += 12
+  } else if (selfAfterTeammates.length >= 2) {
+    score += 4
+  }
+
+  if (selfAfterTeammates.length === 1 && selfAfterOpponents.length >= 2) {
+    score -= 40
+  }
+
+  if (targetPlayerName !== gameState.selfPlayer.name) {
+    const targetPlayerAfter = afterPlayers.find(({ name }) => name === targetPlayerName)
+    const targetAfterTeammates = getLivingPlayersOnAllegiance(afterPlayers, targetPlayerAfter?.allegiance)
+    if (
+      targetPlayerAfter
+      && targetAfterTeammates.length === 1
+      && selfAfterTeammates.length >= 2
+    ) {
+      score += 8
+    }
+  }
 
   return score
 }

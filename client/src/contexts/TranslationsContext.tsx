@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode, useCallback, useMemo } from 'react'
 import { Typography, useTheme } from '@mui/material'
-import { Actions, EventMessages, Influences, PublicGameState, AvailableLanguageCode } from '@shared'
+import { Actions, Allegiances, EventMessages, Influences, PublicGameState, AvailableLanguageCode } from '@shared'
 import { activeLanguageStorageKey } from '../helpers/localStorageKeys'
 import translations, { Translations } from '../i18n/translations'
 import { usePersistedState } from '../hooks/usePersistedState'
@@ -15,7 +15,12 @@ type InfluenceVariables = {
   secondaryInfluence: Influences | undefined
 }
 
-type TranslationVariables = PlayerVariables & InfluenceVariables & {
+type AllegianceVariables = {
+  fromAllegiance: Allegiances | undefined
+  toAllegiance: Allegiances | undefined
+}
+
+type TranslationVariables = PlayerVariables & InfluenceVariables & AllegianceVariables & {
   gameState: PublicGameState | undefined
   count: number | undefined
   action: Actions | undefined
@@ -38,14 +43,28 @@ export function TranslationContextProvider({ children }: Readonly<{ children: Re
   const { influenceColors, actionColors } = useTheme()
 
   const getTranslation = useCallback((key: keyof Translations, variables?: Partial<TranslationVariables>): ReactNode => {
-    const hasActionsKey =
+    const effectiveKey = (
+      key === EventMessages.ActionProcessed
+      && variables?.action === Actions.Convert
+      ? (variables.secondaryPlayer ? 'actionProcessedConvertOther' : 'actionProcessedConvertSelf')
+      : key
+    ) as keyof Translations
+
+    const usesActionTemplates =
       key === EventMessages.ActionConfirm
       || key === EventMessages.ActionPending
       || key === EventMessages.ActionProcessed
 
-    let template = hasActionsKey
-      ? translations[key][variables!.action!]![language]
-      : translations[key][language]
+    let template: string | undefined
+    if (
+      usesActionTemplates
+      && effectiveKey !== 'actionProcessedConvertOther'
+      && effectiveKey !== 'actionProcessedConvertSelf'
+    ) {
+      template = (translations[effectiveKey] as Record<Actions, Record<AvailableLanguageCode, string>>)[variables!.action!]![language]
+    } else {
+      template = (translations[effectiveKey] as Record<AvailableLanguageCode, string>)[language]
+    }
 
     if (!variables || !template) {
       return template
@@ -107,6 +126,35 @@ export function TranslationContextProvider({ children }: Readonly<{ children: Re
                   sx={{ color: influenceColors?.[variables[influenceKey]!] }}
                 >
                   {translations[variables[influenceKey]!][language]}
+                </Typography>,
+                matches[2]
+              )
+            }
+          }
+        })
+      }
+    })
+
+    const allegianceKeys: (keyof AllegianceVariables)[] = [
+      'fromAllegiance',
+      'toAllegiance'
+    ]
+
+    allegianceKeys.forEach((allegianceKey) => {
+      if (variables[allegianceKey] !== undefined) {
+        segments.forEach((segment, i) => {
+          if (typeof segment === 'string') {
+            const matches = [...segment.matchAll(new RegExp(`(.*){{${allegianceKey}}}(.*)`, 'g'))][0]
+            if (matches) {
+              segments.splice(i, 1,
+                matches[1],
+                <Typography
+                  key={allegianceKey}
+                  component='span'
+                  fontWeight={500}
+                  fontSize='inherit'
+                >
+                  {translations[variables[allegianceKey]!][language]}
                 </Typography>,
                 matches[2]
               )

@@ -249,7 +249,7 @@ describe('ai', () => {
       })
     })
 
-    it('chooses opponent Convert when flipping them is better than flipping self', () => {
+    it('chooses another player Convert when it improves team support the most', () => {
       vi.spyOn(Math, 'random').mockReturnValue(0)
 
       const gameState = buildGameState({
@@ -290,7 +290,52 @@ describe('ai', () => {
 
       expect(decideAction(gameState)).toEqual({
         action: Actions.Convert,
-        targetPlayer: 'threat',
+        targetPlayer: 'carol',
+      })
+    })
+
+    it('avoids a Convert that would leave the bot as the sole living member of its allegiance', () => {
+      vi.spyOn(Math, 'random').mockReturnValue(0)
+
+      const gameState = buildGameState({
+        players: [
+          buildPublicPlayer({
+            name: 'bot',
+            coins: 2,
+            allegiance: Allegiances.Loyalist,
+          }),
+          buildPublicPlayer({
+            name: 'ally',
+            coins: 10,
+            allegiance: Allegiances.Loyalist,
+          }),
+          buildPublicPlayer({
+            name: 'enemy-1',
+            coins: 1,
+            allegiance: Allegiances.Reformist,
+          }),
+          buildPublicPlayer({
+            name: 'enemy-2',
+            coins: 0,
+            allegiance: Allegiances.Reformist,
+          }),
+        ],
+        selfPlayer: buildPlayer({
+          id: 'bot-id',
+          name: 'bot',
+          coins: 2,
+          influences: [Influences.Contessa, Influences.Contessa],
+          allegiance: Allegiances.Loyalist,
+        }),
+        settings: {
+          eventLogRetentionTurns: 3,
+          allowRevive: true,
+          enableReformation: true,
+        },
+      })
+
+      expect(decideAction(gameState)).toEqual({
+        action: Actions.Income,
       })
     })
 

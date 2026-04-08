@@ -32,6 +32,8 @@ export type Translations = ActionMessages &
   EmbezzleChallengeResponseMessages &
   AlertColorTranslations & {
     action: TranslationsForString
+    actionProcessedConvertOther: TranslationsForString
+    actionProcessedConvertSelf: TranslationsForString
     actions: TranslationsForString
     add: TranslationsForString
     addAiPlayer: TranslationsForString
@@ -1104,6 +1106,8 @@ const translations: Translations = {
     [Actions.Embezzle]: untranslated('{{primaryPlayer}} {{action[[Embezzled]]}}'),
     [Actions.Examine]: untranslated('{{primaryPlayer}} {{action[[Examined]]}} {{secondaryPlayer}}'),
   },
+  actionProcessedConvertOther: untranslated('{{primaryPlayer}} converted {{secondaryPlayer}} from {{fromAllegiance}} to {{toAllegiance}}'),
+  actionProcessedConvertSelf: untranslated('{{primaryPlayer}} converted from {{fromAllegiance}} to {{toAllegiance}}'),
   [EventMessages.ExamineReturned]: untranslated('{{primaryPlayer}} returned {{secondaryPlayer}}\'s card'),
   [EventMessages.ExamineForcedExchange]: untranslated('{{primaryPlayer}} forced {{secondaryPlayer}} to exchange'),
   [EventMessages.BlockFailed]: {

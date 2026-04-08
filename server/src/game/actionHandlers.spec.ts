@@ -1196,6 +1196,74 @@ describe('actionHandlers', () => {
       expect(gameState.eventLogs.at(-1)?.influence).toBeUndefined()
     })
 
+    it('convert logs who changed allegiance from what to what', async () => {
+      const roomId = await setupTestGame([
+        { ...david, coins: 2 },
+        harper,
+        hailey,
+      ], {
+        ...defaultGameSettings,
+        enableReformation: true,
+      })
+
+      await mutateGameState(await getGameState(roomId), (state) => {
+        state.players.find(({ name }) => name === david.playerName)!.allegiance = Allegiances.Loyalist
+        state.players.find(({ name }) => name === harper.playerName)!.allegiance = Allegiances.Reformist
+        state.players.find(({ name }) => name === hailey.playerName)!.allegiance = Allegiances.Reformist
+        delete state.pendingStartingAllegiance
+      })
+
+      await actionHandler({
+        roomId,
+        playerId: david.playerId,
+        action: Actions.Convert,
+        targetPlayer: harper.playerName,
+      })
+
+      expect((await getGameState(roomId)).eventLogs.at(-1)).toEqual(expect.objectContaining({
+        event: EventMessages.ActionProcessed,
+        action: Actions.Convert,
+        primaryPlayer: david.playerName,
+        secondaryPlayer: harper.playerName,
+        fromAllegiance: Allegiances.Reformist,
+        toAllegiance: Allegiances.Loyalist,
+      }))
+    })
+
+    it('self-convert logs the acting player allegiance transition', async () => {
+      const roomId = await setupTestGame([
+        { ...david, coins: 1 },
+        harper,
+        hailey,
+      ], {
+        ...defaultGameSettings,
+        enableReformation: true,
+      })
+
+      await mutateGameState(await getGameState(roomId), (state) => {
+        state.players.find(({ name }) => name === david.playerName)!.allegiance = Allegiances.Loyalist
+        state.players.find(({ name }) => name === harper.playerName)!.allegiance = Allegiances.Reformist
+        state.players.find(({ name }) => name === hailey.playerName)!.allegiance = Allegiances.Reformist
+        delete state.pendingStartingAllegiance
+      })
+
+      await actionHandler({
+        roomId,
+        playerId: david.playerId,
+        action: Actions.Convert,
+        targetPlayer: david.playerName,
+      })
+
+      expect((await getGameState(roomId)).eventLogs.at(-1)).toEqual(expect.objectContaining({
+        event: EventMessages.ActionProcessed,
+        action: Actions.Convert,
+        primaryPlayer: david.playerName,
+        fromAllegiance: Allegiances.Loyalist,
+        toAllegiance: Allegiances.Reformist,
+      }))
+      expect((await getGameState(roomId)).eventLogs.at(-1)?.secondaryPlayer).toBeUndefined()
+    })
+
     it('coup', async () => {
       const roomId = await setupTestGame([
         david,

@@ -40,6 +40,8 @@ function EventLog() {
                 primaryPlayer: log.primaryPlayer,
                 secondaryPlayer: log.secondaryPlayer,
                 primaryInfluence: log.influence,
+                fromAllegiance: log.fromAllegiance,
+                toAllegiance: log.toAllegiance,
                 gameState
               })}
             </CoupTypography>

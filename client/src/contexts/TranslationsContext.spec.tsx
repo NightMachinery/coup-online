@@ -1,7 +1,7 @@
 import { useEffect } from "react"
 import { describe, it, expect } from 'vitest'
 import { grey } from "@mui/material/colors"
-import { Actions, EventMessages, PublicGameState, AvailableLanguageCode } from "@shared"
+import { Actions, Allegiances, EventMessages, PublicGameState, AvailableLanguageCode } from "@shared"
 import { TranslationContextProvider, useTranslationContext } from "./TranslationsContext"
 import { render } from '../../tests/utilities/render'
 
@@ -30,6 +30,32 @@ const TestTranslationComponent = ({ language }: { language: AvailableLanguageCod
   )
 }
 
+const TestConvertTranslationComponent = ({ language }: { language: AvailableLanguageCode }) => {
+  const { t, setLanguage } = useTranslationContext()
+
+  useEffect(() => {
+    setLanguage(language)
+  }, [])
+
+  return (
+    <p data-testid={`${EventMessages.ActionProcessed}-${Actions.Convert}`}>
+      {t(EventMessages.ActionProcessed, {
+        action: Actions.Convert,
+        gameState: ({
+          players: [
+            { color: 'blue', name: 'David' },
+            { color: 'red', name: 'Bob' }
+          ]
+        }) as unknown as PublicGameState,
+        primaryPlayer: 'David',
+        secondaryPlayer: 'Bob',
+        fromAllegiance: Allegiances.Loyalist,
+        toAllegiance: Allegiances.Reformist,
+      })}
+    </p>
+  )
+}
+
 describe('TranslationContextProvider', () => {
   it('should translate action with template parameters', async () => {
     const { getByTestId, getByText } = render(
@@ -53,5 +79,16 @@ describe('TranslationContextProvider', () => {
     )
 
     getByText('Fechar')
+  })
+
+  it('should translate convert history with allegiance transitions', async () => {
+    const { getByTestId } = render(
+      <TranslationContextProvider>
+        <TestConvertTranslationComponent language={AvailableLanguageCode["en-US"]} />
+      </TranslationContextProvider>
+    )
+
+    expect(getByTestId(`${EventMessages.ActionProcessed}-${Actions.Convert}`))
+      .toHaveTextContent('David converted Bob from Loyalist to Reformist')
   })
 })
