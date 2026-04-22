@@ -1,6 +1,6 @@
 import { vi, type MockInstance, describe, it, expect, afterEach } from 'vitest'
 import Chance from 'chance'
-import { Actions, Allegiances, EventMessages, ExamineResponses, GameSettings, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
+import { Actions, Allegiances, EmbezzleChallengeResponses, EventMessages, ExamineResponses, GameSettings, Influences, PlayerControllers, Responses } from '../../../shared/types/game'
 import {
   actionChallengeResponseHandler,
   actionHandler,
@@ -10,6 +10,7 @@ import {
   blockResponseHandler,
   chooseExamineInfluenceHandler,
   createGameHandler,
+  embezzleChallengeDecisionHandler,
   joinGameHandler,
   loseInfluencesHandler,
   removeFromGameHandler,
@@ -1873,6 +1874,80 @@ describe('actionHandlers', () => {
       expect(gameState.players[0].coins).toBe(5)
       expect(gameState.players[1].coins).toBe(2)
       expect(gameState.players[2].coins).toBe(2)
+    })
+
+    it('embezzle -> failed challenge logs live influence replacement without revealing cards', async () => {
+      const roomId = await setupTestGame([
+        { ...david, influences: [Influences.Assassin, Influences.Captain] },
+        { ...harper, influences: [Influences.Duke, Influences.Ambassador] },
+        { ...hailey, influences: [Influences.Contessa], deadInfluences: [Influences.Captain] },
+      ])
+
+      await mutateGameState(await getGameState(roomId), (state) => {
+        state.treasuryReserveCoins = 5
+      })
+
+      await actionHandler({
+        roomId,
+        playerId: david.playerId,
+        action: Actions.Embezzle,
+      })
+
+      await actionResponseHandler({
+        roomId,
+        playerId: hailey.playerId,
+        response: Responses.Challenge,
+      })
+
+      await embezzleChallengeDecisionHandler({
+        roomId,
+        playerId: david.playerId,
+        response: EmbezzleChallengeResponses.ProveNoDuke,
+      })
+
+      const gameState = await getGameState(roomId)
+
+      expect(gameState.turnPlayer).toBe(harper.playerName)
+      expect(gameState.turn).toBe(2)
+      expect(gameState.treasuryReserveCoins).toBe(0)
+      expect(gameState.players[0].coins).toBe(7)
+      expect(gameState.eventLogs.slice(-6)).toEqual([
+        {
+          event: EventMessages.ChallengePending,
+          primaryPlayer: hailey.playerName,
+          secondaryPlayer: david.playerName,
+          turn: 1,
+        },
+        {
+          event: EventMessages.ChallengeFailed,
+          primaryPlayer: hailey.playerName,
+          secondaryPlayer: david.playerName,
+          turn: 1,
+        },
+        {
+          event: EventMessages.PlayerLostInfluence,
+          primaryPlayer: hailey.playerName,
+          influence: Influences.Contessa,
+          turn: 1,
+        },
+        {
+          event: EventMessages.PlayerDied,
+          primaryPlayer: hailey.playerName,
+          turn: 1,
+        },
+        {
+          event: EventMessages.PlayerReplacedLiveInfluences,
+          primaryPlayer: david.playerName,
+          turn: 1,
+        },
+        {
+          event: EventMessages.ActionProcessed,
+          action: Actions.Embezzle,
+          primaryPlayer: david.playerName,
+          turn: 1,
+        },
+      ])
+      expect(gameState.eventLogs.at(-2)?.influence).toBeUndefined()
     })
 
     it('multiple coups sent to server in rapid succession', async () => {

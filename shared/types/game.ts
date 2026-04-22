@@ -217,6 +217,7 @@ export enum EventMessages {
   PlayerForfeited = 'PlayerForfeited',
   PlayerLostInfluence = 'PlayerLostInfluence',
   PlayerReplacedInfluence = 'PlayerReplacedInfluence',
+  PlayerReplacedLiveInfluences = 'PlayerReplacedLiveInfluences',
   PlayerReplacedWithAi = 'PlayerReplacedWithAi',
   PlayerControllerSetToBot = 'PlayerControllerSetToBot',
   PlayerControllerAssignedToHuman = 'PlayerControllerAssignedToHuman',

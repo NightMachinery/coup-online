@@ -1799,6 +1799,10 @@ export const embezzleChallengeDecisionHandler = async ({ roomId, playerId, respo
       recordInfluenceKill(state, actionPlayer.name, challengePlayer.name)
       promptPlayerToLoseInfluence(state, challengePlayer.name)
       replaceAllLiveInfluences(state, actionPlayer.name)
+      logEvent(state, {
+        event: EventMessages.PlayerReplacedLiveInfluences,
+        primaryPlayer: actionPlayer.name,
+      })
       delete state.pendingEmbezzleChallengeDecision
       processPendingAction(state)
     } else {

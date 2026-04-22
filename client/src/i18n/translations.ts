@@ -97,6 +97,7 @@ export type Translations = ActionMessages &
     [EventMessages.PlayerForfeited]: TranslationsForString
     [EventMessages.PlayerLostInfluence]: TranslationsForString
     [EventMessages.PlayerReplacedInfluence]: TranslationsForString
+    [EventMessages.PlayerReplacedLiveInfluences]: TranslationsForString
     [EventMessages.PlayerReplacedWithAi]: TranslationsForString
     [EventMessages.PlayerControllerSetToBot]: TranslationsForString
     [EventMessages.PlayerControllerAssignedToHuman]: TranslationsForString
@@ -1248,6 +1249,7 @@ const translations: Translations = {
       '{{primaryPlayer}} ha rivelato e sostituito il suo {{primaryInfluence}}',
     'pt-BR': '{{primaryPlayer}} revelou e substituiu sua {{primaryInfluence}}',
   },
+  [EventMessages.PlayerReplacedLiveInfluences]: untranslated('{{primaryPlayer}} replaced their live influences'),
   [EventMessages.PlayerReplacedWithAi]: {
     'de-DE': '{{primaryPlayer}} wurde durch einen KI-Spieler ersetzt',
     'en-US': '{{primaryPlayer}} has been replaced by an AI player',
