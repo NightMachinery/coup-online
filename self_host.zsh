@@ -20,8 +20,27 @@ CADDY_SITE_LABEL=""
 PUBLIC_HOST=""
 
 tmuxnew () {
-	tmux kill-session -t "$1" &> /dev/null || true
-	tmux new -d -s "$@"
+  local session="$1"
+  shift
+
+  tmux kill-session -t "$session" &>/dev/null || true
+  tmux new-session -d -s "$session" "$@"
+}
+
+tmuxnew_with_env() {
+  local session="$1"
+  shift
+  local command="$1"
+  shift
+  local -a tmux_args=(-d -s "$session")
+  local env_assignment
+
+  for env_assignment in "$@"; do
+    tmux_args+=(-e "$env_assignment")
+  done
+
+  tmux kill-session -t "$session" &>/dev/null || true
+  tmux new-session "${tmux_args[@]}" "$command"
 }
 
 say() {
@@ -232,13 +251,6 @@ ensure_artifacts_exist() {
   [[ -f "$CLIENT_ENV_FILE" ]] || die "Missing $CLIENT_ENV_FILE. Run ./self_host.zsh setup first."
 }
 
-tmux_exports() {
-  cat <<'EOF_EXPORTS'
-export ALL_PROXY=http://127.0.0.1:9087 all_proxy=http://127.0.0.1:9087 http_proxy=http://127.0.0.1:9087 https_proxy=http://127.0.0.1:9087 HTTP_PROXY=http://127.0.0.1:9087 HTTPS_PROXY=http://127.0.0.1:9087 npm_config_proxy=http://127.0.0.1:9087 npm_config_https_proxy=http://127.0.0.1:9087;
-export NO_PROXY=127.0.0.1,localhost no_proxy=127.0.0.1,localhost;
-EOF_EXPORTS
-}
-
 run_setup() {
   normalize_target "${1:-$DEFAULT_TARGET}"
   install_apt_packages_if_missing
@@ -262,15 +274,33 @@ run_start() {
   load_node
   need_cmd tmux
 
-  local exports
-  exports="$(tmux_exports)"
   local server_cmd
   local client_cmd
-  server_cmd="$exports cd ${(q)ROOT_DIR}/server; set -a; source ${(q)SERVER_ENV_FILE}; set +a; nvm-load; nvm use ${(q)NODE_VERSION}; node dist/server/index.js"
-  client_cmd="$exports cd ${(q)ROOT_DIR}/client; nvm-load; nvm use ${(q)NODE_VERSION}; pnpm preview --host 127.0.0.1 --port ${(q)CLIENT_PORT}"
+  server_cmd="cd ${(q)ROOT_DIR}/server; set -a; source ${(q)SERVER_ENV_FILE}; set +a; nvm-load; nvm use ${(q)NODE_VERSION}; node dist/server/index.js"
+  client_cmd="cd ${(q)ROOT_DIR}/client; nvm-load; nvm use ${(q)NODE_VERSION}; pnpm preview --host 127.0.0.1 --port ${(q)CLIENT_PORT}"
 
-  tmuxnew "$SESSION_SERVER" zsh -lc "$server_cmd"
-  tmuxnew "$SESSION_CLIENT" zsh -lc "$client_cmd"
+  tmuxnew_with_env "$SESSION_SERVER" "zsh -lc ${(q)server_cmd}" \
+    "ALL_PROXY=http://127.0.0.1:9087" \
+    "all_proxy=http://127.0.0.1:9087" \
+    "http_proxy=http://127.0.0.1:9087" \
+    "https_proxy=http://127.0.0.1:9087" \
+    "HTTP_PROXY=http://127.0.0.1:9087" \
+    "HTTPS_PROXY=http://127.0.0.1:9087" \
+    "npm_config_proxy=http://127.0.0.1:9087" \
+    "npm_config_https_proxy=http://127.0.0.1:9087" \
+    "NO_PROXY=127.0.0.1,localhost" \
+    "no_proxy=127.0.0.1,localhost"
+  tmuxnew_with_env "$SESSION_CLIENT" "zsh -lc ${(q)client_cmd}" \
+    "ALL_PROXY=http://127.0.0.1:9087" \
+    "all_proxy=http://127.0.0.1:9087" \
+    "http_proxy=http://127.0.0.1:9087" \
+    "https_proxy=http://127.0.0.1:9087" \
+    "HTTP_PROXY=http://127.0.0.1:9087" \
+    "HTTPS_PROXY=http://127.0.0.1:9087" \
+    "npm_config_proxy=http://127.0.0.1:9087" \
+    "npm_config_https_proxy=http://127.0.0.1:9087" \
+    "NO_PROXY=127.0.0.1,localhost" \
+    "no_proxy=127.0.0.1,localhost"
 
   say "Started tmux sessions: $SESSION_SERVER, $SESSION_CLIENT"
 }

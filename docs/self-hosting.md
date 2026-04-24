@@ -28,6 +28,8 @@ This repo includes a bare-metal self-host flow with no Docker.
 
 `self_host.zsh setup` will try to install missing `tmux`, `caddy`, and `redis-server` with `apt-get` when available.
 
+The tmux-managed server and client sessions receive their proxy settings as literal environment values, so `NO_PROXY` lists such as `127.0.0.1,localhost,::1` do not rely on fragile shell quoting.
+
 ## Commands
 
 From repo root:
